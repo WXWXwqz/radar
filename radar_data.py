@@ -1,0 +1,823 @@
+import datetime
+import bisect
+import matplotlib.pyplot as plt
+import pickle
+import numpy as np
+import os
+from typing import List
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
+from sklearn.feature_selection import mutual_info_regression
+from sklearn.metrics import mutual_info_score
+import pandas as pd
+def find_closest_numbers(nums):
+    closest_nums = []
+    for i, num in enumerate(nums):
+        closest = None
+        closest_distance = float('inf')
+        for j, other_num in enumerate(nums):
+            if i != j:
+                distance = abs(num - other_num)
+                if distance < closest_distance:
+                    closest_distance = distance
+                    closest = other_num
+        closest_nums.append(closest)
+    return closest_nums
+
+class Lane_Info:
+    def __init__(self,frame) -> None:
+        self.no = frame[0]
+        self.color = frame[1]
+        self.cd_time = int.from_bytes(frame[2:4],byteorder='little')
+        self.byLaneQueueLength = frame[4]
+        self.lon_last_car = int.from_bytes(frame[5:9],byteorder='little')
+        self.lat_last_car = int.from_bytes(frame[9:13],byteorder='little')
+        self.QueueVehNum = frame[13]
+        self.SectionVehNum = frame[14]
+        self.SpaceOccupancy = frame[15]
+        self.AveSpeed = frame[16]
+        self.HeadLocation = frame[17]
+        self.HeadSpeed = frame[18]
+
+class Obj_Info:    
+    def __init__(self,frame) -> None:
+        # print(len(frame))
+        self.obj_id = int.from_bytes(frame[0:2],byteorder="little")
+        self.obj_len = frame[2]
+        self.obj_width = frame[3]
+        self.yaw = int.from_bytes(frame[4:6],byteorder='little')
+        self.x = int.from_bytes(frame[6:10],byteorder='little',signed=True) # 0.01m
+        self.y = int.from_bytes(frame[10:14],byteorder='little',signed=True) #0.01m
+        self.speed = int.from_bytes(frame[14:16],byteorder='little') # 0.01km/h
+        self.radar_dir = frame[16]
+        self.car_num = frame[17:37]
+        self.lon = int.from_bytes(frame[37:41],byteorder='little')
+        self.lat = int.from_bytes(frame[41:45],byteorder='little')
+        self.obj_type = frame[45]
+        self.car_color = frame[46]
+        self.plate_color = frame[47]
+        self.stop_num = frame[48]
+        self.paking_delay = int.from_bytes(frame[49:51],byteorder='little')
+        self.obj_status = frame[51]
+        self.is_in_lane = frame[52]
+        self.track_source = frame[53]
+        self.video_dir = frame[54]
+        self.video_id = frame[55]
+        self.video_car_typd = frame[56]
+        self.video_obj_id = int.from_bytes(frame[57:59],byteorder='little')
+        self.radar_obj_id = int.from_bytes(frame[59:61],byteorder='little')
+        self.obj_flux = frame[61]   #目标转向
+        self.obj_lanenum = frame[62]
+        self.RCS = int.from_bytes(frame[63:65],byteorder='little')
+        self.vX = int.from_bytes(frame[65:67],byteorder='little',signed=True)
+        self.vY = int.from_bytes(frame[67:69],byteorder='little',signed=True)
+        self.accX = int.from_bytes(frame[69:71],byteorder='little',signed=True)
+        self.axxY = int.from_bytes(frame[71:73],byteorder='little',signed=True)
+        
+        None
+
+class Radar_Feature:
+    def __init__(self,start_time:datetime.datetime,end_time:datetime.datetime,path) -> None:
+        self.start_time=start_time
+        self.end_time = end_time
+        # self.feature_dim = len(feature_names)
+        
+        self.feature_func_dict={}
+        self.feature_func_dict['obj_num']=self.cal_feature_obj_num
+        self.feature_func_dict['obj_num_rate']=self.cal_feature_obj_num_rate
+        self.feature_func_dict['obj_num_highspeed']=self.cal_feature_obj_num_high_speed
+        self.feature_func_dict['obj_num_highspeed_rate']=self.cal_feature_obj_num_high_speed_rate
+        self.feature_func_dict['obj_num_lowspeed']=self.cal_feature_obj_num_low_speed
+        self.feature_func_dict['obj_num_lowspeed_rate']=self.cal_feature_obj_num_low_speed_rate
+        self.feature_func_dict['obj_avespeed']=self.cal_feature_ave_speed
+        self.feature_func_dict['obj_avespeed_rate']=self.cal_feature_ave_speed_rate
+        self.feature_func_dict['obj_speed_std']=self.cal_feature_speed_std
+        self.feature_func_dict['obj_avg_nearest_X_dist']=self.cal_feature_avg_nearest_X_dist
+        self.feature_func_dict['obj_avg_nearest_Y_dist']=self.cal_feature_avg_nearest_Y_dist
+        self.feature_func_dict['obj_avg_nearest_XY_dist']=self.cal_feature_avg_nearest_XY_dist
+        self.feature_func_dict['lane_speed_std']=self.cal_feature_lane_speed_std
+        self.feature_func_dict['lane_objnum_std']=self.cal_feature_lane_objnum_std
+
+        
+        self.feature_name = list(self.feature_func_dict.keys())[:]
+        self.speed_th = 1000
+        self.frame_diff_N = 1000
+
+        
+
+
+        self.feature_dim = len(self.feature_name)
+        self.feature_seque_len = 100  # 100ms 一个数据，一帧数据的时间为feature_seque_len*0.1s
+        self.feature_seque_offset = 5 # 1s 间隔进行数据偏移
+        
+        self.raw_data_file_name=[]
+        self.raw_data:List[Radar_Dat] = self.get_raw_data(path)
+        self.raw_data_time = [item.time for item in self.raw_data]
+        self.feature_time_dict={}
+        self.feature_data_dict={}
+        self.index = bisect.bisect(self.raw_data_time, self.start_time)
+        self.indexend = bisect.bisect(self.raw_data_time, self.end_time)
+        # self.cal_feature([11,31,51,71])
+        None
+
+    def cal_feature_ave_speed(self,s_index,dir): 
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�?1km/h 或�?1m/s
+            if len(obj_dir)==0:
+                re.append(0)
+            else:
+                re.append(sum(obj_dir)/len(obj_dir))        
+        return np.array(re).reshape(len(re),1)
+
+    def cal_feature_ave_speed_rate(self,s_index,dir):    
+        re= []
+        rePreN= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]
+        seque_data_preN = self.raw_data[s_index-self.frame_diff_N:s_index+self.feature_seque_len-self.frame_diff_N]
+        for d in seque_data:
+            obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+            if len(obj_dir)==0:
+                re.append(0)
+            else:
+                re.append(sum(obj_dir)/len(obj_dir))     
+        for d in seque_data_preN:
+            obj_dir_preN = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+            if len(obj_dir_preN)==0:
+                rePreN.append(0)
+            else:
+                rePreN.append(sum(obj_dir_preN)/len(obj_dir_preN))   
+        return (np.array(re)-np.array(rePreN)).reshape(len(re),1)
+    def cal_feature_speed_std(self,s_index,dir):   #标准�?
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�?1km/h 或�?1m/s
+            if len(obj_dir)==0:
+                re.append(0)
+            else:
+                re.append(np.std(obj_dir))        
+        return np.array(re).reshape(len(re),1)
+    def cal_feature_obj_num(self,s_index,dir):        
+        re= []
+        
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+            re.append(len(obj_dir))        
+        return np.array(re).reshape(len(re),1)
+    
+    def cal_feature_obj_num_rate(self,s_index,dir):        
+        re= []
+        rePreN= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]
+        seque_data_preN = self.raw_data[s_index-self.frame_diff_N:s_index+self.feature_seque_len-self.frame_diff_N]
+        for d in seque_data:
+            obj_dir = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+            re.append(len(obj_dir))    
+        for d in seque_data_preN:
+            obj_dir_preN = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+            rePreN.append(len(obj_dir_preN))   
+        return (np.array(re)-np.array(rePreN)).reshape(len(re),1)
+
+    def cal_feature_obj_num_high_speed(self,s_index,dir):        
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+            obj_dir_highspeed = [obj for obj in obj_dir if obj.speed>self.speed_th]
+            re.append(len(obj_dir_highspeed))        
+        return np.array(re).reshape(len(re),1)
+
+    def cal_feature_obj_num_high_speed_rate(self,s_index,dir):        
+        re= []
+        rePreN= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]
+        seque_data_preN = self.raw_data[s_index-self.frame_diff_N:s_index+self.feature_seque_len-self.frame_diff_N]
+        for d in seque_data:
+            obj_dir = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10) and obj.speed>self.speed_th]
+            re.append(len(obj_dir))    
+        for d in seque_data_preN:
+            obj_dir_preN = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10) and obj.speed>self.speed_th]
+            rePreN.append(len(obj_dir_preN))   
+        return (np.array(re)-np.array(rePreN)).reshape(len(re),1)
+
+    def cal_feature_obj_num_low_speed(self,s_index,dir):        
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+            obj_dir_highspeed = [obj for obj in obj_dir if obj.speed<=self.speed_th]
+            re.append(len(obj_dir_highspeed))        
+        return np.array(re).reshape(len(re),1)
+
+    def cal_feature_obj_num_low_speed_rate(self,s_index,dir):        
+        re= []
+        rePreN= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]
+        seque_data_preN = self.raw_data[s_index-self.frame_diff_N:s_index+self.feature_seque_len-self.frame_diff_N]
+        for d in seque_data:
+            obj_dir = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10) and obj.speed<=self.speed_th]
+            re.append(len(obj_dir))    
+        for d in seque_data_preN:
+            obj_dir_preN = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10) and obj.speed<=self.speed_th]
+            rePreN.append(len(obj_dir_preN))   
+        return (np.array(re)-np.array(rePreN)).reshape(len(re),1)
+    def cal_feature_avg_nearest_X_dist(self,s_index,dir): 
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [obj.x/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #距离转换为m
+            obj_dir_closest = find_closest_numbers(obj_dir)  
+            if len(obj_dir)==0:
+                re.append(0)
+            elif len(obj_dir)==1:
+                re.append(100)
+            else:
+                re.append(sum(obj_dir_closest)/len(obj_dir_closest))        
+        return np.array(re).reshape(len(re),1)
+    
+    def cal_feature_avg_nearest_Y_dist(self,s_index,dir): 
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [obj.y/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #距离转换为m
+            obj_dir_closest = find_closest_numbers(obj_dir)  
+            if len(obj_dir)==0:
+                re.append(0)
+            elif len(obj_dir)==1:
+                re.append(100)
+            else:
+                re.append(sum(obj_dir_closest)/len(obj_dir_closest))        
+        return np.array(re).reshape(len(re),1)
+
+    def cal_feature_avg_nearest_XY_dist(self,s_index,dir): 
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [(obj.y/100*obj.y/100*+obj.x/100*obj.x/100)**0.5 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #距离转换为m
+            obj_dir_closest = find_closest_numbers(obj_dir)  
+            if len(obj_dir)==0:
+                re.append(0)
+            elif len(obj_dir)==1:
+                re.append(100)
+            else:
+                re.append(sum(obj_dir_closest)/len(obj_dir_closest))        
+        return np.array(re).reshape(len(re),1)
+    def cal_feature_lane_speed_std(self,s_index,dir): 
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            lane_speed_dict={}
+            for obj in d.obj_info:
+                if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10):
+                    if obj.obj_lanenum not in lane_speed_dict.keys():
+                        lane_speed_dict[obj.obj_lanenum] = [obj.speed/100]
+                    else:
+                        lane_speed_dict[obj.obj_lanenum].append(obj.speed/100)
+            each_lane_avgspeed=[]
+            for lane_speed in lane_speed_dict.values():
+                each_lane_avgspeed.append(sum(lane_speed)/len(lane_speed))
+            if len(each_lane_avgspeed)==0:
+                re.append(0)
+            else:
+                re.append(np.std(each_lane_avgspeed))  
+        return np.array(re).reshape(len(re),1)
+    def cal_feature_lane_objnum_std(self,s_index,dir): 
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+
+            lane_num_dict={}
+            for obj in d.obj_info:
+                if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10):
+                    if obj.obj_lanenum not in lane_num_dict.keys():
+                        lane_num_dict[obj.obj_lanenum] = 1
+                    else:
+                        lane_num_dict[obj.obj_lanenum]+=1
+            each_lane_avgspeed=[]
+            for lane_obj_num in lane_num_dict.values():
+                each_lane_avgspeed.append(lane_obj_num)
+            if len(each_lane_avgspeed)==0:
+                re.append(0)
+            else:
+                re.append(np.std(each_lane_avgspeed))  
+        return np.array(re).reshape(len(re),1)
+
+    def cal_feature(self,dirs):        
+        index = self.index  
+        indexend = self.indexend
+
+        while index<len(self.raw_data):     
+            if self.raw_data_time[index]>self.end_time:
+                break      
+            print(index,"/",indexend)
+            if index <self.feature_seque_len+self.frame_diff_N:
+                index = self.feature_seque_len+self.frame_diff_N
+            s_index = index-self.feature_seque_len
+            dir_f={}
+            for name in self.feature_name:
+                for dir in dirs:
+                    f_d = self.feature_func_dict[name](s_index,dir)
+                    if dir not in dir_f.keys():
+                        dir_f[dir] = f_d.reshape(self.feature_seque_len,1)
+                    else:
+                        dir_f[dir] = np.concatenate((dir_f[dir] , f_d), axis=1)
+                    # print(dir_f[dir].shape)
+                    None    
+            for dir in dir_f.keys():
+                if dir not in self.feature_data_dict.keys():
+                    self.feature_data_dict[dir] = dir_f[dir].reshape(1,self.feature_seque_len,self.feature_dim)
+                    self.feature_time_dict[dir] = [self.raw_data_time[index]]
+                else:
+                    self.feature_data_dict[dir] = np.concatenate((self.feature_data_dict[dir], dir_f[dir].reshape(1,self.feature_seque_len,self.feature_dim)), axis=0)
+                    self.feature_time_dict[dir].append(self.raw_data_time[index])
+            index +=self.feature_seque_offset
+
+
+                    
+
+
+
+
+        # print([d.time for d in seque_data])
+        # print(self.raw_data_time[index])
+        # print(index)
+
+        None
+
+
+    def get_raw_data(self,path):
+        pre_time = self.start_time - datetime.timedelta(hours=1)        
+        current_time = pre_time
+        raw_data=[]
+        while current_time <= self.end_time:
+            print(current_time)
+            pkl_file = path+current_time.strftime('%Y%m%d_%H')+'.pkl'
+            self.raw_data_file_name.append(pkl_file)            
+            current_time += datetime.timedelta(hours=1)
+        pkl_file = path+self.end_time.strftime('%Y%m%d_%H')+'.pkl'
+        if pkl_file not in self.raw_data_file_name:
+            self.raw_data_file_name.append(pkl_file)        
+        for pkl_file in self.raw_data_file_name:
+            if not os.path.exists(pkl_file):
+                continue
+            with open(pkl_file, 'rb') as file:
+                loaded_data = pickle.load(file)
+                raw_data = raw_data+loaded_data    
+        return raw_data    
+    
+class Radar_Dat:
+    def __init__(self) -> None:
+        self.time:datetime.datetime = None
+        self.year=0
+        self.month=0
+        self.day =0
+        self.hour = 0
+        self.min=0
+        self.sec = 0
+        self.msec = 0        
+        self.head_str=""
+        self.lane_info=[]
+        self.obj_info:List[Obj_Info]=[]
+        self.obj_x_coords=[]
+        self.obj_y_coords=[]
+
+    def feature_cal(self):
+
+        None
+
+    def decode(self,frame):
+        self.head_str = frame[0:12].decode('utf-8')
+        self.year = frame[0+12]+1900
+        self.month = frame[1+12]
+        self.day = frame[2+12]
+        self.hour = frame[3+12]
+        self.min = frame[4+12]
+        self.sec = frame[5+12]
+        self.msec = int.from_bytes(frame[6+12:12+8], byteorder='little')  # 小端字节�?
+        self.time = datetime.datetime(year=self.year,month=self.month,day=self.day,hour=self.hour,minute=self.min,second=self.sec,microsecond=self.msec*1000)
+        self.lane_num=frame[20]
+        self.lane_len=frame[21]
+        self.lane_data_size = self.lane_num*self.lane_len
+        for i in range(self.lane_num):
+            lane_i = Lane_Info(frame=frame[22+self.lane_len*i:22+self.lane_len*(i+1)])
+            self.lane_info.append(lane_i)
+            None
+        self.obj_num=int.from_bytes(frame[22+self.lane_data_size:24+self.lane_data_size],byteorder="little")
+        self.obj_len =int.from_bytes(frame[24+self.lane_data_size:26+self.lane_data_size],byteorder="little")
+        diff = 26+self.lane_data_size
+        for i in range(self.obj_num):
+            if len(frame[diff+self.obj_len*i:diff+self.obj_len*(i+1)])!=73:
+                print("NNNNNNNNN",len(frame[diff+self.obj_len*i:diff+self.obj_len*(i+1)]))
+                continue
+            obj_i = Obj_Info(frame=frame[diff+self.obj_len*i:diff+self.obj_len*(i+1)])
+            self.obj_info.append(obj_i)
+        
+        # self.obj_x_coords_dict={}
+
+        self.obj_x_coords=[obj.x for obj in self.obj_info]
+        self.obj_y_coords=[obj.y for obj in self.obj_info]
+    def plot_obj(self,dir_list):
+
+        for dir in dir_list:
+            obj_info = [obj for obj in self.obj_info if obj.radar_dir == dir]
+            obj_x_coords=[obj.x for obj in obj_info]
+            obj_y_coords=[obj.y for obj in obj_info]
+            plt.scatter(obj_x_coords,obj_y_coords)
+            # 为每个点标注其坐�?
+            for point in obj_info:
+                plt.annotate(f"({point.x}, {point.y})", (point.x, point.y))
+
+        # 显示图形
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.title(str(dir_list))
+        plt.grid(True)
+        plt.show(block=False)
+
+    def plot_obj_d(self, dir_list,fig, ax):
+        # 清除子图
+        ax.clear()
+        ax.set_xlim([0, 30000])
+        ax.set_ylim([-3000, 3000])
+        for dir in dir_list:
+            obj_info = [obj for obj in self.obj_info if (obj.radar_dir == dir and obj.obj_lanenum!=255)]
+            obj_x_coords = [obj.x for obj in obj_info]
+            obj_y_coords = [obj.y for obj in obj_info]
+            ax.scatter(obj_x_coords, obj_y_coords)
+            # 为每个点标注其坐�?
+            for point in obj_info:
+                ax.annotate(f"{point.x},{point.y},{point.obj_lanenum}", (point.x, point.y))
+        # datetime.datetime.strptime("")
+        ax.set_title(str(self.time))
+        
+        # 显示更新后的�?
+        plt.draw()
+        plt.pause(0.001)
+
+
+
+
+def find_dat_files(directory):
+    dat_files = []
+
+    # 遍历目录
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith('.dat'):
+                dat_files.append(os.path.join(root, file))
+
+    return dat_files
+
+def read_frames_from_file(filename):
+    frames = []
+    cnt=0
+    with open(filename, 'rb') as file:
+        buffer = b""
+        while True:
+            byte = file.read(1)
+            
+            if not byte:
+                # 文件结束时，如果缓冲区中有数据，将其作为最后一帧存�?
+                if buffer:
+                    frames.append(buffer)
+                break
+
+            buffer += byte
+            if buffer[-12:] == b'[radar_data]':
+                if len(buffer) > 12:  # 如果不是第一个帧
+                    cnt +=1
+                    # print(cnt)
+                    # if cnt>10:
+                    #     break
+                    frames.append(buffer[:-12])  # 保存当前缓冲区中的数据，不包括新找到的标识符
+                    buffer = buffer[-12:]  # 保留新找到的标识符作为下一个帧的开�?
+    
+    return frames
+
+def read_dat_file(filename):
+    with open(filename, 'rb') as file:
+        # 假设每次都读�?4个字节，即一个int值（仅为示例�?
+        while True:
+            data = file.read(12)  # 读取4个字�?
+            if not data:
+                break
+            # 假设是little-endian的整�?
+            str_radar_code  = data.decode()
+            value = int.from_bytes(data, byteorder='little')
+            # value = str.from
+            print(value)
+
+def read_dat_to_pkl(file_path):
+    dat_file_list = find_dat_files(file_path)
+    dat_file_list = sorted(dat_file_list)
+    pkl_dict={}
+    last_date=None
+    for dat_file in dat_file_list:
+        frame_list = read_frames_from_file(dat_file)
+        print(dat_file)
+        for frame in frame_list:
+            if len(frame)==5840:
+                print(len(frame))
+            radar_dat = Radar_Dat()
+            try:
+                radar_dat.decode(frame)
+            except:
+                print("decode error")
+                continue
+            time_str_toh = radar_dat.time.strftime('%Y%m%d_%H')
+            if time_str_toh not in  pkl_dict.keys():
+                if len(pkl_dict.keys())!=0:
+                    pkl_save_path = file_path+'pkl/'
+                    os.makedirs(pkl_save_path,exist_ok=True)
+                    with open(pkl_save_path+last_date+'.pkl', 'wb') as file:
+                        pickle.dump(pkl_dict[last_date], file)
+                        print(pkl_save_path+last_date+'.pkl')
+                        del pkl_dict[last_date] #删除，清理内�?
+
+
+                pkl_dict[time_str_toh]=[]
+                pkl_dict[time_str_toh].append(radar_dat)                
+            else:
+                pkl_dict[time_str_toh].append(radar_dat)
+            last_date = time_str_toh
+            
+
+# if __name__ == "__main__":
+
+#     # read_dat_to_pkl("./data/real/96/")
+
+#     radar_dat_list : List[Radar_Dat]= []
+#     with open('./data/real/161/pkl/20231024_19.pkl', 'rb') as file:
+#         radar_dat_list = pickle.load(file)
+#     for i in  range(len(radar_dat_list)):
+#         radar_dat = radar_dat_list[i]
+#         print(i,radar_dat.time)
+#     None
+
+
+def tsne_display(data):
+    data_reshaped = data.reshape(data.shape[0], -1)  # 将数据重塑为 (N, 4200)
+    # 使用t-SNE进行降维
+    tsne = TSNE(n_components=2, random_state=42)
+    data_tsne = tsne.fit_transform(data_reshaped)
+
+    # 可视�?
+    plt.figure(figsize=(10, 6))
+    plt.scatter(data_tsne[:, 0], data_tsne[:, 1], alpha=0.5)
+    plt.title("t-SNE visualization of the data")
+    plt.xlabel("Component 1")
+    plt.ylabel("Component 2")
+    plt.grid(True)
+    plt.show()
+def pcatsne_display1(data1, data2):
+    # 合并数据
+    merged_data = np.concatenate((data1, data2), axis=0)
+
+    # 1. 重塑数据�? (N, 4200)
+    data_reshaped = merged_data.reshape(merged_data.shape[0], -1)
+
+    # 2. 使用PCA进行初步降维
+    pca = PCA(n_components=50)
+    data_pca = pca.fit_transform(data_reshaped)
+
+    # 3. 使用t-SNE进一步降�?
+    tsne = TSNE(n_components=2, random_state=42)
+    data_tsne = tsne.fit_transform(data_pca)
+
+    # 4. 为两个数据集分配颜色
+    colors = ['red'] * len(data1) + ['blue'] * len(data2)
+
+    # 5. 可视�?
+    plt.figure(figsize=(10, 6))
+    plt.scatter(data_tsne[:, 0], data_tsne[:, 1], c=colors, alpha=0.5)
+    plt.title("t-SNE visualization of the data")
+    plt.xlabel("Component 1")
+    plt.ylabel("Component 2")
+    plt.grid(True)
+    plt.show()
+def pcatsne_display(data):
+    data_reshaped = data.reshape(data.shape[0], -1)  # 将数据重塑为 (N, 4200)
+    # 使用t-SNE进行降维
+# 2. 使用PCA进行初步降维
+    pca = PCA(n_components=50)
+    data_pca = pca.fit_transform(data_reshaped)
+
+    # 3. 使用t-SNE进一步降�?
+    tsne = TSNE(n_components=2, random_state=42)
+    data_tsne = tsne.fit_transform(data_pca)
+
+    # 4. 可视�?
+    plt.figure(figsize=(10, 6))
+    plt.scatter(data_tsne[:, 0], data_tsne[:, 1], alpha=0.5)
+    plt.title("t-SNE visualization of the data")
+    plt.xlabel("Component 1")
+    plt.ylabel("Component 2")
+    plt.grid(True)
+    plt.show()
+def MI_cal(data):
+    MI_values = []
+
+    for t in range(data.shape[1]):
+        X = data[:, t, 0].reshape(-1, 1)  # �?1个特�?
+        Y = data[:, t, 1]                 # �?2个特�?
+        MI = mutual_info_regression(X, Y)
+        MI_values.append(MI[0])
+    print(MI_values)
+
+
+def pcatsne_display2(data_list):
+    # 1. 合并数据
+    merged_data = np.concatenate(data_list, axis=0)
+
+    # 2. 重塑数据�? (N, 4200)
+    data_reshaped = merged_data.reshape(merged_data.shape[0], -1)
+
+    # 3. 使用PCA进行初步降维
+    pca = PCA(n_components=50)
+    data_pca = pca.fit_transform(data_reshaped)
+
+    # 4. 使用t-SNE进一步降
+    tsne = TSNE(n_components=2, random_state=42)
+    data_tsne = tsne.fit_transform(data_pca)
+
+    # 5. 生成颜色列表
+    colors = plt.cm.rainbow(np.linspace(0, 1, len(data_list)))
+    
+    # 6. 可视�?
+    plt.figure(figsize=(10, 6))
+    start_idx = 0
+    for i, data in enumerate(data_list):
+        plt.scatter(data_tsne[start_idx:start_idx+len(data), 0],
+                    data_tsne[start_idx:start_idx+len(data), 1], 
+                    color=colors[i], 
+                    alpha=0.5, 
+                    label=f'Dataset {i+1}')
+        start_idx += len(data)
+
+    plt.title("t-SNE visualization of the data")
+    plt.xlabel("Component 1")
+    plt.ylabel("Component 2")
+    plt.legend()
+    plt.grid(True)
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    image_filename = f"tsne_{current_time}.png"
+    plt.savefig(image_filename)
+    plt.show()
+
+
+
+
+
+
+
+
+
+# def compute_avg_MI(data):
+#     N, T, F = data.shape  # 获取数据的形状，其中T应该�?300，F应该�?14
+#     MI_matrices = []
+
+#     for t in range(T):
+#         MI_matrix_t = np.zeros((F, F))
+#         for i in range(F):
+#             for j in range(F):
+#                 MI_matrix_t[i, j] = mutual_info_score(data[:, t, i], data[:, t, j])
+#         MI_matrices.append(MI_matrix_t)
+
+#     avg_MI_matrix = np.mean(MI_matrices, axis=0)
+#     return avg_MI_matrix
+
+def mutual_information(x, y, bins=30):
+    c_xy = np.histogram2d(x, y, bins)[0]
+    mi = mutual_info_score(None, None, contingency=c_xy)
+    return mi
+
+def compute_avg_MI(data):
+    N, T, F = data.shape  # 获取数据的形�?
+    MI_matrices = []
+
+    for t in range(T):
+        MI_matrix_t = np.zeros((F, F))
+        for i in range(F):
+            for j in range(F):
+                MI_matrix_t[i, j] = mutual_information(data[:, t, i], data[:, t, j])
+        MI_matrices.append(MI_matrix_t)
+
+    avg_MI_matrix = np.mean(MI_matrices, axis=0)
+    return avg_MI_matrix
+
+def display_the_origin_radar_data(start_time,end_time,path):
+
+
+    radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path=path)
+    # frame_list = read_frames_from_file("./data/real/161/20231023_190148.dat")
+    
+
+    # radar_dat_list = []
+    fig, ax = plt.subplots()
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.grid(True)
+    plt.show(block=False)
+
+
+    for frame in radar_feature.raw_data[radar_feature.index:radar_feature.indexend]:
+        # radar_dat = Radar_Dat()
+        # radar_dat.decode(frame)
+        # print(radar_dat.time)
+        frame.plot_obj_d([1],fig, ax)
+        # radar_dat.plot_obj(3)
+        # radar_dat.plot_obj(5)
+        # radar_dat.plot_obj(7)
+
+        # radar_dat_list.append(radar_dat)
+
+        None
+    
+    
+    # with open('radar_data.pkl', 'wb') as file:
+    #     pickle.dump(radar_dat_list, file)
+
+    # with open('radar_data.pkl', 'rb') as file:
+    #     loaded_data = pickle.load(file)
+    # None
+ 
+
+# if __name__ == "__main__":
+    
+    # read_dat_to_pkl("./data/real/mmAcc/5008/")
+#     start_time = datetime.datetime(2023,10,31,17,30,0)
+#     end_time = datetime.datetime(2023,10,31,18,0,0)
+#     display_the_origin_radar_data(start_time=start_time,end_time=end_time,path="./data/real/mmAcc/5008/pkl/")
+
+if __name__ == "__main__":
+
+    # frame_list = read_frames_from_file("./data/20231030_141514.dat")
+    # for frame in frame_list:
+    #     radar_dat = Radar_Dat()
+    #     radar_dat.decode(frame)
+
+
+    # read_dat_to_pkl("./data/real/mmAcc/5008/")
+    # start_time = datetime.datetime(2023,10,31,17,5,0)
+    # end_time = datetime.datetime(2023,10,31,17,25,0)
+    # radar_feature1 = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/real/mmAcc/5008/pkl/')
+    # radar_feature1.cal_feature([11])
+    # avg_MI=compute_avg_MI(radar_feature1.feature_data_dict[11])
+    # df_avg_MI = pd.DataFrame(avg_MI)
+    # print(df_avg_MI)
+    # read_dat_to_pkl("./data/real/mmAcc/5008/")
+    start_time = datetime.datetime(2023,10,31,17,5,0)
+    end_time = datetime.datetime(2023,10,31,17,25,0)
+    radar_feature3 = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')
+    radar_feature3.cal_feature([11])
+    np.save("acc1.npy",radar_feature3.feature_data_dict[11])
+
+    start_time = datetime.datetime(2023,10,31,17,35,0)
+    end_time = datetime.datetime(2023,10,31,17,55,0)
+    radar_feature2 = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')
+    radar_feature2.cal_feature([11])
+    np.save("normal2.npy",radar_feature2.feature_data_dict[11])
+
+    start_time = datetime.datetime(2023,11,1,17,30,0)
+    end_time = datetime.datetime(2023,11,1,17,50,0)
+    radar_feature4 = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')
+    radar_feature4.cal_feature([11])
+    np.save("normal1.npy",radar_feature4.feature_data_dict[11])
+
+    # start_time = datetime.datetime(2023,10,31,17,15,0)
+    # end_time = datetime.datetime(2023,10,31,17,25,0)
+    # radar_feature1 = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/real/mmAcc/5008/pkl/')
+    # radar_feature1.cal_feature([11])    
+
+    # start_time = datetime.datetime(2023,10,31,17,40,0)
+    # end_time = datetime.datetime(2023,10,31,17,50,0)
+    # radar_feature4 = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/real/mmAcc/5008/pkl/')
+    # radar_feature4.cal_feature([11])    
+            # if len(self.feature_data_dict[1])>1000:
+    # tsne_display( np.concatenate(( radar_feature1.feature_data_dict[1], radar_feature2.feature_data_dict[1]),axis=0))
+    # pcatsne_display( np.concatenate(( radar_feature1.feature_data_dict[11], radar_feature2.feature_data_dict[11]),axis=0))
+    pcatsne_display2([radar_feature4.feature_data_dict[11], radar_feature2.feature_data_dict[11]])
+    # with open('radar_data_feature.pkl', 'wb') as file:
+    #     pickle.dump([radar_feature.feature_time_dict,radar_feature.feature_data_dict], file)
+
+    # with open('radar_data.pkl', 'rb') as file:
+    #     loaded_data = pickle.load(file)
+    # radar_feature.feature_time_dict={}
+    # radar_feature.feature_data_dict={}
+    None
+
+
+
+
