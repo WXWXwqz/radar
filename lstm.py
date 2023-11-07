@@ -3,6 +3,8 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 import numpy as np
 import random
+import datetime
+from radar_data import get_npy_dataset,get_npy_feature,Radar_Dat,Lane_Info,Obj_Info  # 从radar_data.py中导入get_npy_dataset函数
 
 # 定义LSTM模型
 class LSTMBinaryClassifier(nn.Module):
@@ -47,7 +49,7 @@ def train(model, train_loader, criterion, optimizer, device):
         total_loss += loss.item()
 
     return total_loss / len(train_loader)
-def test(model, test_loader, criterion, device, confidence_threshold=0.9):
+def test(model, test_loader, criterion, device, confidence_threshold=0.7):
     model.eval()
     total_loss = 0.0
     correct = 0
@@ -116,12 +118,11 @@ def test(model, test_loader, criterion, device, confidence_threshold=0.9):
 #     return total_loss / len(test_loader), accuracy
 
 def main_test():
-    X_test = np.load('acc1.npy')
-    y_test = np.zeros(X_test.shape[0])
+    # X_test,y_test = get_npy_dataset(['acc.npy', 'normal.npy','acc1.npy','normal1.npy','normal2.npy'])
+    X_test,y_test = get_npy_dataset(['acc4.npy','normal4.npy'])
     num_samples = X_test.shape[0]
     random_indices = np.arange(num_samples)
     np.random.shuffle(random_indices)
-
     x_data_shuffled = X_test[random_indices]
     y_data_shuffled = y_test[random_indices]
 
@@ -139,35 +140,23 @@ def main_test():
     num_layers = 2
     output_size = 2
     model = LSTMBinaryClassifier(input_size, hidden_size, num_layers, output_size).to(device)
-    model.load_state_dict(torch.load('9932_model.pkl'))
+    model.load_state_dict(torch.load('9915_model.pkl'))
     # model = torch.load('9932_model.pkl')
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     
     test_loss,test_accuracy,false_negative_rate, false_positive_rate= test(model, test_loader, criterion, device)
-    print(f"Test Loss: {test_loss:.4f} - Test Accuracy: {test_accuracy * 100:.2f}% - False Negative Rate: {false_negative_rate * 100:.2f}% - False Positive Rate: {false_positive_rate * 100:.2f}%")
+    print(f"Test Loss: {test_loss:.4f} - Test Accuracy: {test_accuracy * 100:.2f}% - 漏报率: {false_negative_rate * 100:.2f}% - 误报率: {false_positive_rate * 100:.2f}%")
     # print(f"Test Loss: {test_loss:.4f} - Test Accuracy: {test_accuracy * 100:.2f}%")
 
-if __name__ == "__main__":
+if __name__ == "__main__-":
+    start_time = datetime.datetime(2023,10,31,17,5,0)
+    end_time = datetime.datetime(2023,10,31,17,25,0)
+    get_npy_feature(start_time=datetime.datetime(2023,11,1,17,40,0),end_time=datetime.datetime(2023,11,1,17,45,0),save_names='normal4.npy',dir=52)
     main_test()
 
-if __name__ == "__main__":
-
-    dateset_list = ['acc.npy', 'normal.npy','acc1.npy','normal1.npy','normal2.npy']
-    x_data = None
-    for datename in dateset_list:
-        X_train = np.load(datename)
-        if 'acc' in datename:
-            y_train = np.ones(X_train.shape[0])
-        elif 'normal' in datename:
-            y_train = np.zeros(X_train.shape[0])
-        if x_data is None:
-            x_data = X_train
-            y_data = y_train
-        else:
-            x_data = np.concatenate((x_data, X_train), axis=0)
-            y_data = np.concatenate((y_data, y_train), axis=0)
-        
+if __name__ == "__main__":   
+    x_data,y_data = get_npy_dataset(['acc.npy', 'normal.npy','acc1.npy','normal1.npy','normal3.npy','normal2.npy','acc4.npy','normal4.npy'])
 
     num_samples = x_data.shape[0]
     random_indices = np.arange(num_samples)
@@ -196,7 +185,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # 创建模型实例，定义损失函数和优化器
     input_size = 14
-    hidden_size = 64
+    hidden_size = 128
     num_layers = 2
     output_size = 2
     model = LSTMBinaryClassifier(input_size, hidden_size, num_layers, output_size).to(device)
@@ -208,7 +197,7 @@ if __name__ == "__main__":
         train_loss = train(model, train_loader, criterion, optimizer, device)
         # test_loss, test_accuracy = test(model, test_loader, criterion, device)
         test_loss,test_accuracy,false_negative_rate, false_positive_rate= test(model, test_loader, criterion, device)
-        print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {train_loss:.4f} - Test Loss: {test_loss:.4f} - Test Accuracy: {test_accuracy * 100:.2f}% - False Negative Rate: {false_negative_rate * 100:.2f}% - False Positive Rate: {false_positive_rate * 100:.2f}%")
+        print(f"Epoch [{epoch+1}/{num_epochs}] - Train Loss: {train_loss:.4f} - Test Loss: {test_loss:.4f} - Test Accuracy: {test_accuracy * 100:.2f}% - 漏保 Rate: {false_negative_rate * 100:.2f}% - 误报 Rate: {false_positive_rate * 100:.2f}%")
         if test_accuracy > 0.99:
             torch.save(model.state_dict(), str(int(test_accuracy*10000))+'_model.pkl')
             break

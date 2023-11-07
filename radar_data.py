@@ -11,6 +11,27 @@ from sklearn.decomposition import PCA
 from sklearn.feature_selection import mutual_info_regression
 from sklearn.metrics import mutual_info_score
 import pandas as pd
+
+def get_npy_dataset(dateset_list):
+    # dateset_list = ['acc.npy', 'normal.npy','acc1.npy','normal1.npy','normal2.npy']
+    x_data = None
+    for datename in dateset_list:
+        X_train = np.load(datename)
+        if 'acc' in datename:
+            y_train = np.ones(X_train.shape[0])
+        elif 'normal' in datename:
+            y_train = np.zeros(X_train.shape[0])
+        if x_data is None:
+            x_data = X_train
+            y_data = y_train
+        else:
+            x_data = np.concatenate((x_data, X_train), axis=0)
+            y_data = np.concatenate((y_data, y_train), axis=0)
+    return x_data,y_data
+def get_npy_feature(start_time,end_time,save_names,dir,path='./data/mmAcc/5008/pkl/'):
+    radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path=path)
+    radar_feature.cal_feature([dir])
+    np.save(save_names,radar_feature.feature_data_dict[dir])
 def find_closest_numbers(nums):
     closest_nums = []
     for i, num in enumerate(nums):
