@@ -81,7 +81,7 @@ class Obj_Info:
         self.stop_num = frame[48]
         self.paking_delay = int.from_bytes(frame[49:51],byteorder='little')
         self.obj_status = frame[51]
-        self.is_in_lane = frame[52]
+        self.is_in_lane = frame[52]  #1 进口�? 0 出口�?
         self.track_source = frame[53]
         self.video_dir = frame[54]
         self.video_id = frame[55]
@@ -129,7 +129,7 @@ class Radar_Feature:
 
 
         self.feature_dim = len(self.feature_name)
-        self.feature_seque_len = 100  # 100ms 一个数据，一帧数据的时间为feature_seque_len*0.1s
+        self.feature_seque_len = 300  # 100ms 一个数据，一帧数据的时间为feature_seque_len*0.1s
         self.feature_seque_offset = 5 # 1s 间隔进行数据偏移
         
         self.raw_data_file_name=[]
@@ -147,7 +147,7 @@ class Radar_Feature:
         seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
         for d in seque_data:
             obj_num =0 
-            obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�?1km/h 或�?1m/s
+            obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
             if len(obj_dir)==0:
                 re.append(0)
             else:
@@ -172,12 +172,12 @@ class Radar_Feature:
             else:
                 rePreN.append(sum(obj_dir_preN)/len(obj_dir_preN))   
         return (np.array(re)-np.array(rePreN)).reshape(len(re),1)
-    def cal_feature_speed_std(self,s_index,dir):   #标准�?
+    def cal_feature_speed_std(self,s_index,dir):   #标准�??
         re= []
         seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
         for d in seque_data:
             obj_num =0 
-            obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�?1km/h 或�?1m/s
+            obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
             if len(obj_dir)==0:
                 re.append(0)
             else:
@@ -359,10 +359,10 @@ class Radar_Feature:
             for dir in dir_f.keys():
                 if dir not in self.feature_data_dict.keys():
                     self.feature_data_dict[dir] = dir_f[dir].reshape(1,self.feature_seque_len,self.feature_dim)
-                    self.feature_time_dict[dir] = [self.raw_data_time[index]]
+                    self.feature_time_dict[dir] = [self.raw_data_time[index].strftime('%Y%m%d_%H%M%S%f')[:-3]]
                 else:
                     self.feature_data_dict[dir] = np.concatenate((self.feature_data_dict[dir], dir_f[dir].reshape(1,self.feature_seque_len,self.feature_dim)), axis=0)
-                    self.feature_time_dict[dir].append(self.raw_data_time[index])
+                    self.feature_time_dict[dir].append(self.raw_data_time[index].strftime('%Y%m%d_%H%M%S%f')[:-3])
             index +=self.feature_seque_offset
 
 
@@ -426,7 +426,7 @@ class Radar_Dat:
         self.hour = frame[3+12]
         self.min = frame[4+12]
         self.sec = frame[5+12]
-        self.msec = int.from_bytes(frame[6+12:12+8], byteorder='little')  # 小端字节�?
+        self.msec = int.from_bytes(frame[6+12:12+8], byteorder='little')  # 小端字节�??
         self.time = datetime.datetime(year=self.year,month=self.month,day=self.day,hour=self.hour,minute=self.min,second=self.sec,microsecond=self.msec*1000)
         self.lane_num=frame[20]
         self.lane_len=frame[21]
@@ -456,7 +456,7 @@ class Radar_Dat:
             obj_x_coords=[obj.x for obj in obj_info]
             obj_y_coords=[obj.y for obj in obj_info]
             plt.scatter(obj_x_coords,obj_y_coords)
-            # 为每个点标注其坐�?
+            # 为每个点标注其坐�??
             for point in obj_info:
                 plt.annotate(f"({point.x}, {point.y})", (point.x, point.y))
 
@@ -477,18 +477,28 @@ class Radar_Dat:
             obj_x_coords = [obj.x for obj in obj_info]
             obj_y_coords = [obj.y for obj in obj_info]
             ax.scatter(obj_x_coords, obj_y_coords)
-            # 为每个点标注其坐�?
+            # 为每个点标注其坐�??
             for point in obj_info:
                 ax.annotate(f"{point.x},{point.y},{point.obj_lanenum}", (point.x, point.y))
         # datetime.datetime.strptime("")
         ax.set_title(str(self.time))
         
-        # 显示更新后的�?
+        # 显示更新后的�??
         plt.draw()
         plt.pause(0.001)
 
 
+def find_files_withend(directory,end):
+    dat_files = []
 
+    # 遍历目录
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(end):
+                dat_files.append(os.path.join(root, file))
+        break
+
+    return dat_files
 
 def find_dat_files(directory):
     dat_files = []
@@ -510,7 +520,7 @@ def read_frames_from_file(filename):
             byte = file.read(1)
             
             if not byte:
-                # 文件结束时，如果缓冲区中有数据，将其作为最后一帧存�?
+                # 文件结束时，如果缓冲区中有数据，将其作为最后一帧存�??
                 if buffer:
                     frames.append(buffer)
                 break
@@ -523,18 +533,18 @@ def read_frames_from_file(filename):
                     # if cnt>10:
                     #     break
                     frames.append(buffer[:-12])  # 保存当前缓冲区中的数据，不包括新找到的标识符
-                    buffer = buffer[-12:]  # 保留新找到的标识符作为下一个帧的开�?
+                    buffer = buffer[-12:]  # 保留新找到的标识符作为下一个帧的开�??
     
     return frames
 
 def read_dat_file(filename):
     with open(filename, 'rb') as file:
-        # 假设每次都读�?4个字节，即一个int值（仅为示例�?
+        # 假设每次都读�??4个字节，即一个int值（仅为示例�??
         while True:
-            data = file.read(12)  # 读取4个字�?
+            data = file.read(12)  # 读取4个字�??
             if not data:
                 break
-            # 假设是little-endian的整�?
+            # 假设是little-endian的整�??
             str_radar_code  = data.decode()
             value = int.from_bytes(data, byteorder='little')
             # value = str.from
@@ -565,7 +575,7 @@ def read_dat_to_pkl(file_path):
                     with open(pkl_save_path+last_date+'.pkl', 'wb') as file:
                         pickle.dump(pkl_dict[last_date], file)
                         print(pkl_save_path+last_date+'.pkl')
-                        del pkl_dict[last_date] #删除，清理内�?
+                        del pkl_dict[last_date] #删除，清理内
 
 
                 pkl_dict[time_str_toh]=[]
@@ -594,7 +604,7 @@ def tsne_display(data):
     tsne = TSNE(n_components=2, random_state=42)
     data_tsne = tsne.fit_transform(data_reshaped)
 
-    # 可视�?
+    # 可视�??
     plt.figure(figsize=(10, 6))
     plt.scatter(data_tsne[:, 0], data_tsne[:, 1], alpha=0.5)
     plt.title("t-SNE visualization of the data")
@@ -606,21 +616,21 @@ def pcatsne_display1(data1, data2):
     # 合并数据
     merged_data = np.concatenate((data1, data2), axis=0)
 
-    # 1. 重塑数据�? (N, 4200)
+    # 1. 重塑数据�?? (N, 4200)
     data_reshaped = merged_data.reshape(merged_data.shape[0], -1)
 
     # 2. 使用PCA进行初步降维
     pca = PCA(n_components=50)
     data_pca = pca.fit_transform(data_reshaped)
 
-    # 3. 使用t-SNE进一步降�?
+    # 3. 使用t-SNE进一步降�??
     tsne = TSNE(n_components=2, random_state=42)
     data_tsne = tsne.fit_transform(data_pca)
 
     # 4. 为两个数据集分配颜色
     colors = ['red'] * len(data1) + ['blue'] * len(data2)
 
-    # 5. 可视�?
+    # 5. 可视�??
     plt.figure(figsize=(10, 6))
     plt.scatter(data_tsne[:, 0], data_tsne[:, 1], c=colors, alpha=0.5)
     plt.title("t-SNE visualization of the data")
@@ -635,11 +645,11 @@ def pcatsne_display(data):
     pca = PCA(n_components=50)
     data_pca = pca.fit_transform(data_reshaped)
 
-    # 3. 使用t-SNE进一步降�?
+    # 3. 使用t-SNE进一步降�??
     tsne = TSNE(n_components=2, random_state=42)
     data_tsne = tsne.fit_transform(data_pca)
 
-    # 4. 可视�?
+    # 4. 可视�??
     plt.figure(figsize=(10, 6))
     plt.scatter(data_tsne[:, 0], data_tsne[:, 1], alpha=0.5)
     plt.title("t-SNE visualization of the data")
@@ -651,8 +661,8 @@ def MI_cal(data):
     MI_values = []
 
     for t in range(data.shape[1]):
-        X = data[:, t, 0].reshape(-1, 1)  # �?1个特�?
-        Y = data[:, t, 1]                 # �?2个特�?
+        X = data[:, t, 0].reshape(-1, 1)  # �??1个特�??
+        Y = data[:, t, 1]                 # �??2个特�??
         MI = mutual_info_regression(X, Y)
         MI_values.append(MI[0])
     print(MI_values)
@@ -662,7 +672,7 @@ def pcatsne_display2(data_list):
     # 1. 合并数据
     merged_data = np.concatenate(data_list, axis=0)
 
-    # 2. 重塑数据�? (N, 4200)
+    # 2. 重塑数据�?? (N, 4200)
     data_reshaped = merged_data.reshape(merged_data.shape[0], -1)
 
     # 3. 使用PCA进行初步降维
@@ -676,7 +686,7 @@ def pcatsne_display2(data_list):
     # 5. 生成颜色列表
     colors = plt.cm.rainbow(np.linspace(0, 1, len(data_list)))
     
-    # 6. 可视�?
+    # 6. 可视�??
     plt.figure(figsize=(10, 6))
     start_idx = 0
     for i, data in enumerate(data_list):
@@ -706,7 +716,7 @@ def pcatsne_display2(data_list):
 
 
 # def compute_avg_MI(data):
-#     N, T, F = data.shape  # 获取数据的形状，其中T应该�?300，F应该�?14
+#     N, T, F = data.shape  # 获取数据的形状，其中T应该�??300，F应该�??14
 #     MI_matrices = []
 
 #     for t in range(T):
@@ -725,7 +735,7 @@ def mutual_information(x, y, bins=30):
     return mi
 
 def compute_avg_MI(data):
-    N, T, F = data.shape  # 获取数据的形�?
+    N, T, F = data.shape  # 获取数据的形�??
     MI_matrices = []
 
     for t in range(T):
@@ -775,14 +785,83 @@ def display_the_origin_radar_data(start_time,end_time,path):
     # None
  
 
-# if __name__ == "__main__":
+
+def main_get_npy_dataset():
+
+
+    start_time_list=["20231107_151000","20231107_161000","20231107_153500","20231107_151000","20231107_155500","20231107_152500","20231107_152500","20231107_161500"]
+    end_time_list=  ["20231107_152500","20231107_162500","20231107_155000","20231107_152500","20231107_160500","20231107_154000","20231107_154000","20231107_163000"]
+    dir_list=       [11,                11,               50,               50,               51,               51,               10,               10]
+    is_acc_list=    [1,                  0,               1,                0,                1,                0,                0,                 1]
+
+    for i in range(len(start_time_list)):
+        start_time = datetime.datetime.strptime(start_time_list[i],"%Y%m%d_%H%M%S")
+        end_time = datetime.datetime.strptime(end_time_list[i],"%Y%m%d_%H%M%S")
+        dir = dir_list[i]
+        is_acc = is_acc_list[i]
+        radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')
+        radar_feature.cal_feature([dir])
+        save_name = "./npy/"+ start_time.strftime('%Y%m%d_%H%M%S')+"_"+end_time.strftime('%Y%m%d_%H%M%S')+ "dir"+str(int(dir//10))+"_"+"in"+str(dir%10)+"_data_"
+        if is_acc==1:
+            np.save(save_name+"acc.npy",radar_feature.feature_data_dict[dir])
+        else:
+            np.save(save_name+"normal.npy",radar_feature.feature_data_dict[dir])
+        np.save(save_name+"time.npy",radar_feature.feature_time_dict[dir])
+
+
+    # dir =11
+    # start_time = datetime.datetime(2023,11,7,15,10,0)
+    # end_time = datetime.datetime(2023,11,7,15,25,0)
+    # radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')    
+    # radar_feature.cal_feature([dir])
+    # save_name = "./npy/"+ start_time.strftime('%Y%m%d_%H%M%S')+"_"+end_time.strftime('%Y%m%d_%H%M%S')+ "dir"+str(int(dir//10))+"_"+"in"+str(dir%10)+"_data_"
+    # np.save(save_name+"acc.npy",radar_feature.feature_data_dict[dir])
+    # np.save(save_name+"time.npy",radar_feature.feature_time_dict[dir])
+
+
+
+    # dir =11
+    # start_time = datetime.datetime(2023,11,7,16,10,0)
+    # end_time = datetime.datetime(2023,11,7,16,25,0)
+    # radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')    
+    # radar_feature.cal_feature([dir])
+    # save_name = "./npy/"+ start_time.strftime('%Y%m%d_%H%M%S')+"_"+end_time.strftime('%Y%m%d_%H%M%S')+"dir1_in1_data_"
+    # np.save(save_name+"normal.npy",radar_feature.feature_data_dict[dir])
+    # np.save(save_name+"time.npy",radar_feature.feature_time_dict[dir])
+
+    # dir =50
+    # start_time = datetime.datetime(2023,11,7,15,10,0)
+    # end_time = datetime.datetime(2023,11,7,15,25,0)
+    # radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')
+    # radar_feature.cal_feature([dir])
+    # save_name = "./npy/"+ start_time.strftime('%Y%m%d_%H%M%S')+"_"+end_time.strftime('%Y%m%d_%H%M%S')+ "dir"+str(int(dir//10))+"_"+"in"+str(dir%10)+"_data_"
+    # np.save(save_name+"normal.npy",radar_feature.feature_data_dict[dir])
+    # np.save(save_name+"time.npy",radar_feature.feature_time_dict[dir])
+
+
+
+    # dir =50
+    # start_time = datetime.datetime(2023,11,7,15,35,0)
+    # end_time = datetime.datetime(2023,11,7,15,55,0)
+    # radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')
+    # radar_feature.cal_feature([dir])
+    # save_name = "./npy/"+ start_time.strftime('%Y%m%d_%H%M%S')+"_"+end_time.strftime('%Y%m%d_%H%M%S')+ "dir"+str(int(dir//10))+"_"+"in"+str(dir%10)+"_data_"
+    # np.save(save_name+"acc.npy",radar_feature.feature_data_dict[dir])
+    # np.save(save_name+"time.npy",radar_feature.feature_time_dict[dir])
+
     
-    # read_dat_to_pkl("./data/real/mmAcc/5008/")
+
+if __name__ == "__main__":
+
+    main_get_npy_dataset()
+    
+    read_dat_to_pkl("./data/mmAcc/5008/")
 #     start_time = datetime.datetime(2023,10,31,17,30,0)
 #     end_time = datetime.datetime(2023,10,31,18,0,0)
 #     display_the_origin_radar_data(start_time=start_time,end_time=end_time,path="./data/real/mmAcc/5008/pkl/")
 
-if __name__ == "__main__":
+
+if __name__ == "__main__-":
 
     # frame_list = read_frames_from_file("./data/20231030_141514.dat")
     # for frame in frame_list:
