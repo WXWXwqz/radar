@@ -11,6 +11,7 @@ from sklearn.decomposition import PCA
 from sklearn.feature_selection import mutual_info_regression
 from sklearn.metrics import mutual_info_score
 import pandas as pd
+from multiprocessing import Process
 
 def get_npy_dataset(dateset_list):
     # dateset_list = ['acc.npy', 'normal.npy','acc1.npy','normal1.npy','normal2.npy']
@@ -21,6 +22,8 @@ def get_npy_dataset(dateset_list):
             y_train = np.ones(X_train.shape[0])
         elif 'normal' in datename:
             y_train = np.zeros(X_train.shape[0])
+        elif 'inference' in datename:
+            y_train = np.ones(X_train.shape[0])+1
         if x_data is None:
             x_data = X_train
             y_data = y_train
@@ -89,12 +92,12 @@ class Obj_Info:
         self.video_obj_id = int.from_bytes(frame[57:59],byteorder='little')
         self.radar_obj_id = int.from_bytes(frame[59:61],byteorder='little')
         self.obj_flux = frame[61]   #目标转向
-        self.obj_lanenum = frame[62]
+        self.obj_lanenum = frame[62]  #车道号
         self.RCS = int.from_bytes(frame[63:65],byteorder='little')
         self.vX = int.from_bytes(frame[65:67],byteorder='little',signed=True)
         self.vY = int.from_bytes(frame[67:69],byteorder='little',signed=True)
         self.accX = int.from_bytes(frame[69:71],byteorder='little',signed=True)
-        self.axxY = int.from_bytes(frame[71:73],byteorder='little',signed=True)
+        self.accY = int.from_bytes(frame[71:73],byteorder='little',signed=True)
         
         None
 
@@ -112,13 +115,29 @@ class Radar_Feature:
         self.feature_func_dict['obj_num_lowspeed']=self.cal_feature_obj_num_low_speed
         self.feature_func_dict['obj_num_lowspeed_rate']=self.cal_feature_obj_num_low_speed_rate
         self.feature_func_dict['obj_avespeed']=self.cal_feature_ave_speed
+        self.feature_func_dict['obj_aveaccX']=self.cal_feature_ave_accX
+        self.feature_func_dict['obj_aveaccY']=self.cal_feature_ave_accY       
+
+        self.feature_func_dict['obj_avexspeed']=self.cal_feature_ave_x_speed
+        self.feature_func_dict['obj_aveyspeed']=self.cal_feature_ave_y_speed
         self.feature_func_dict['obj_avespeed_rate']=self.cal_feature_ave_speed_rate
+        self.feature_func_dict['obj_avexspeed_rate']=self.cal_feature_ave_x_speed_rate
+        self.feature_func_dict['obj_aveyspeed_rate']=self.cal_feature_ave_y_speed_rate
+
         self.feature_func_dict['obj_speed_std']=self.cal_feature_speed_std
+        self.feature_func_dict['obj_xspeed_std']=self.cal_feature_x_speed_std
+        self.feature_func_dict['obj_yspeed_std']=self.cal_feature_y_speed_std        
+
         self.feature_func_dict['obj_avg_nearest_X_dist']=self.cal_feature_avg_nearest_X_dist
         self.feature_func_dict['obj_avg_nearest_Y_dist']=self.cal_feature_avg_nearest_Y_dist
         self.feature_func_dict['obj_avg_nearest_XY_dist']=self.cal_feature_avg_nearest_XY_dist
         self.feature_func_dict['lane_speed_std']=self.cal_feature_lane_speed_std
+        self.feature_func_dict['lane_xspeed_std']=self.cal_feature_lane_xspeed_std
+        self.feature_func_dict['lane_yspeed_std']=self.cal_feature_lane_yspeed_std
+
         self.feature_func_dict['lane_objnum_std']=self.cal_feature_lane_objnum_std
+        # self.feature_data_dict['is_lane_in']=self.cal_feature_lane_is_in
+        # self.feature_data_dict['lane_color']=self.cal_feature_lane_color
 
         
         self.feature_name = list(self.feature_func_dict.keys())[:]
@@ -141,7 +160,23 @@ class Radar_Feature:
         self.indexend = bisect.bisect(self.raw_data_time, self.end_time)
         # self.cal_feature([11,31,51,71])
         None
+    
+    # def cal_feature_lane_color(self,s_index,dir):
+    #     re= []
+    #     seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+    #     for d in seque_data:
+    #         for lane in d.lane_info:
+    #             if lane.
+    #             if lane.no==dir:
+    #                 re.append(lane.color)        
 
+    # def cal_featrue_lane_is_in(self,s_index,dir):
+    #     re= []
+    #     seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+    #     for d in seque_data:
+    #         re.append(dir%10)    
+    #     return np.array(re).reshape(len(re),1)
+    
     def cal_feature_ave_speed(self,s_index,dir): 
         re= []
         seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
@@ -153,6 +188,52 @@ class Radar_Feature:
             else:
                 re.append(sum(obj_dir)/len(obj_dir))        
         return np.array(re).reshape(len(re),1)
+    def cal_feature_ave_accX(self,s_index,dir): 
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [obj.accX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
+            if len(obj_dir)==0:
+                re.append(0)
+            else:
+                re.append(sum(obj_dir)/len(obj_dir))        
+        return np.array(re).reshape(len(re),1)
+    def cal_feature_ave_accY(self,s_index,dir): 
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [obj.accX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
+            if len(obj_dir)==0:
+                re.append(0)
+            else:
+                re.append(sum(obj_dir)/len(obj_dir))        
+        return np.array(re).reshape(len(re),1)
+    def cal_feature_ave_x_speed(self,s_index,dir): 
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [obj.vX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
+            if len(obj_dir)==0:
+                re.append(0)
+            else:
+                re.append(sum(obj_dir)/len(obj_dir))        
+        return np.array(re).reshape(len(re),1)
+
+    def cal_feature_ave_y_speed(self,s_index,dir): 
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [obj.vY/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
+            if len(obj_dir)==0:
+                re.append(0)
+            else:
+                re.append(sum(obj_dir)/len(obj_dir))        
+        return np.array(re).reshape(len(re),1)
+
 
     def cal_feature_ave_speed_rate(self,s_index,dir):    
         re= []
@@ -172,12 +253,76 @@ class Radar_Feature:
             else:
                 rePreN.append(sum(obj_dir_preN)/len(obj_dir_preN))   
         return (np.array(re)-np.array(rePreN)).reshape(len(re),1)
+
+    def cal_feature_ave_x_speed_rate(self,s_index,dir):    
+        re= []
+        rePreN= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]
+        seque_data_preN = self.raw_data[s_index-self.frame_diff_N:s_index+self.feature_seque_len-self.frame_diff_N]
+        for d in seque_data:
+            obj_dir = [obj.vX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+            if len(obj_dir)==0:
+                re.append(0)
+            else:
+                re.append(sum(obj_dir)/len(obj_dir))     
+        for d in seque_data_preN:
+            obj_dir_preN = [obj.vX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+            if len(obj_dir_preN)==0:
+                rePreN.append(0)
+            else:
+                rePreN.append(sum(obj_dir_preN)/len(obj_dir_preN))   
+        return (np.array(re)-np.array(rePreN)).reshape(len(re),1)    
+
+    def cal_feature_ave_y_speed_rate(self,s_index,dir):    
+        re= []
+        rePreN= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]
+        seque_data_preN = self.raw_data[s_index-self.frame_diff_N:s_index+self.feature_seque_len-self.frame_diff_N]
+        for d in seque_data:
+            obj_dir = [obj.vY/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+            if len(obj_dir)==0:
+                re.append(0)
+            else:
+                re.append(sum(obj_dir)/len(obj_dir))     
+        for d in seque_data_preN:
+            obj_dir_preN = [obj.vY/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+            if len(obj_dir_preN)==0:
+                rePreN.append(0)
+            else:
+                rePreN.append(sum(obj_dir_preN)/len(obj_dir_preN))   
+        return (np.array(re)-np.array(rePreN)).reshape(len(re),1)    
+
+
+
+
     def cal_feature_speed_std(self,s_index,dir):   #标准�??
         re= []
         seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
         for d in seque_data:
             obj_num =0 
             obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
+            if len(obj_dir)==0:
+                re.append(0)
+            else:
+                re.append(np.std(obj_dir))        
+        return np.array(re).reshape(len(re),1)
+    def cal_feature_x_speed_std(self,s_index,dir):   #标准�??
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [obj.vX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
+            if len(obj_dir)==0:
+                re.append(0)
+            else:
+                re.append(np.std(obj_dir))        
+        return np.array(re).reshape(len(re),1)
+    def cal_feature_y_speed_std(self,s_index,dir):   #标准�??
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            obj_num =0 
+            obj_dir = [obj.vY/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
             if len(obj_dir)==0:
                 re.append(0)
             else:
@@ -306,6 +451,45 @@ class Radar_Feature:
                         lane_speed_dict[obj.obj_lanenum] = [obj.speed/100]
                     else:
                         lane_speed_dict[obj.obj_lanenum].append(obj.speed/100)
+            each_lane_avgspeed=[]
+            for lane_speed in lane_speed_dict.values():
+                each_lane_avgspeed.append(sum(lane_speed)/len(lane_speed))
+            if len(each_lane_avgspeed)==0:
+                re.append(0)
+            else:
+                re.append(np.std(each_lane_avgspeed))  
+        return np.array(re).reshape(len(re),1)
+    def cal_feature_lane_xspeed_std(self,s_index,dir): 
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            lane_speed_dict={}
+            for obj in d.obj_info:
+                if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10):
+                    if obj.obj_lanenum not in lane_speed_dict.keys():
+                        lane_speed_dict[obj.obj_lanenum] = [obj.vX/100]
+                    else:
+                        lane_speed_dict[obj.obj_lanenum].append(obj.vX/100)
+            each_lane_avgspeed=[]
+            for lane_speed in lane_speed_dict.values():
+                each_lane_avgspeed.append(sum(lane_speed)/len(lane_speed))
+            if len(each_lane_avgspeed)==0:
+                re.append(0)
+            else:
+                re.append(np.std(each_lane_avgspeed))  
+        return np.array(re).reshape(len(re),1)
+
+    def cal_feature_lane_yspeed_std(self,s_index,dir): 
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            lane_speed_dict={}
+            for obj in d.obj_info:
+                if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10):
+                    if obj.obj_lanenum not in lane_speed_dict.keys():
+                        lane_speed_dict[obj.obj_lanenum] = [obj.vY/100]
+                    else:
+                        lane_speed_dict[obj.obj_lanenum].append(obj.vY/100)
             each_lane_avgspeed=[]
             for lane_speed in lane_speed_dict.values():
                 each_lane_avgspeed.append(sum(lane_speed)/len(lane_speed))
@@ -784,15 +968,45 @@ def display_the_origin_radar_data(start_time,end_time,path):
     #     loaded_data = pickle.load(file)
     # None
  
+def process_radar_data(start_time, end_time, dir, is_acc):
+    start_time = datetime.datetime.strptime(start_time, "%Y%m%d_%H%M%S")
+    end_time = datetime.datetime.strptime(end_time, "%Y%m%d_%H%M%S")
+    
+    radar_feature = Radar_Feature(start_time=start_time, end_time=end_time, path='./data/mmAcc/5008/pkl/')
+    radar_feature.cal_feature([dir])
+    
+    save_name = f"./npy/{start_time.strftime('%Y%m%d_%H%M%S')}_{end_time.strftime('%Y%m%d_%H%M%S')}dir{int(dir//10)}_in{dir%10}_data_"
+    
+    if is_acc == 1:
+        np.save(save_name + "acc.npy", radar_feature.feature_data_dict[dir])
+    elif is_acc == 0:
+        np.save(save_name + "normal.npy", radar_feature.feature_data_dict[dir])
+    elif is_acc == -1:
+        np.save(save_name + "inference.npy", radar_feature.feature_data_dict[dir])
+    
+    np.save(save_name + "time.npy", radar_feature.feature_time_dict[dir])
 
+def main_get_inference_tst_dataset_mp():
+    start_time_list = ["20231107_150000","20231107_150000", "20231107_150000", "20231107_150000"]
+    end_time_list = ["20231107_164000", "20231107_164000","20231107_164000", "20231107_164000"]
+    dir_list = [11, 10, 51, 50]
+    is_acc_list = [-1,-1, -1, -1]
+    
+    processes = []
+    
+    for i in range(len(start_time_list)):
+        p = Process(target=process_radar_data, args=(start_time_list[i], end_time_list[i], dir_list[i], is_acc_list[i]))
+        processes.append(p)
+        p.start()
+    
+    for p in processes:
+        p.join()
+def main_get_inference_tst_dataset():
 
-def main_get_npy_dataset():
-
-
-    start_time_list=["20231107_151000","20231107_161000","20231107_153500","20231107_151000","20231107_155500","20231107_152500","20231107_152500","20231107_161500"]
-    end_time_list=  ["20231107_152500","20231107_162500","20231107_155000","20231107_152500","20231107_160500","20231107_154000","20231107_154000","20231107_163000"]
-    dir_list=       [11,                11,               50,               50,               51,               51,               10,               10]
-    is_acc_list=    [1,                  0,               1,                0,                1,                0,                0,                 1]
+    start_time_list=["20231107_150000","20231107_150000","20231107_150000","20231107_150000"]
+    end_time_list=  ["20231107_164000","20231107_164000","20231107_164000","20231107_164000"]
+    dir_list=       [11,10,51,50]
+    is_acc_list=    [-1,-1,-1,-1]
 
     for i in range(len(start_time_list)):
         start_time = datetime.datetime.strptime(start_time_list[i],"%Y%m%d_%H%M%S")
@@ -804,118 +1018,92 @@ def main_get_npy_dataset():
         save_name = "./npy/"+ start_time.strftime('%Y%m%d_%H%M%S')+"_"+end_time.strftime('%Y%m%d_%H%M%S')+ "dir"+str(int(dir//10))+"_"+"in"+str(dir%10)+"_data_"
         if is_acc==1:
             np.save(save_name+"acc.npy",radar_feature.feature_data_dict[dir])
-        else:
+        elif is_acc==0:
             np.save(save_name+"normal.npy",radar_feature.feature_data_dict[dir])
+        elif is_acc==-1:
+            np.save(save_name+"inference.npy",radar_feature.feature_data_dict[dir])
+                    
         np.save(save_name+"time.npy",radar_feature.feature_time_dict[dir])
 
 
-    # dir =11
-    # start_time = datetime.datetime(2023,11,7,15,10,0)
-    # end_time = datetime.datetime(2023,11,7,15,25,0)
-    # radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')    
-    # radar_feature.cal_feature([dir])
-    # save_name = "./npy/"+ start_time.strftime('%Y%m%d_%H%M%S')+"_"+end_time.strftime('%Y%m%d_%H%M%S')+ "dir"+str(int(dir//10))+"_"+"in"+str(dir%10)+"_data_"
-    # np.save(save_name+"acc.npy",radar_feature.feature_data_dict[dir])
-    # np.save(save_name+"time.npy",radar_feature.feature_time_dict[dir])
+def main_get_npy_dataset():
+
+    # start_time_list=["20231107_151000","20231107_154500","20231107_153500","20231107_150000","20231107_155500","20231107_152500","20231107_152500","20231107_161500"]
+    # end_time_list=  ["20231107_152500","20231107_171000","20231107_155000","20231107_152500","20231107_160500","20231107_154000","20231107_154000","20231107_163000"]
+    # dir_list=       [11,                11,               50,               50,               51,               51,               10,               10              ] 
+    # is_acc_list=    [1,                  0,               1,                0,                1,                0,                0,                 1              ]
+
+    start_time_list = ["20231106_080000","20231106_080000","20231106_080000","20231106_080000"]
+    end_time_list =   ["20231106_090000","20231106_090000","20231106_090000","20231106_090000"] 
+    dir_list = [ 11,10, 51, 50]
+    is_acc_list = [0,0,0,0]
+    
+    processes = []
+    
+    for i in range(len(start_time_list)):
+        p = Process(target=process_radar_data, args=(start_time_list[i], end_time_list[i], dir_list[i], is_acc_list[i]))
+        processes.append(p)
+        p.start()
+    
+    for p in processes:
+        p.join()
 
 
-
-    # dir =11
-    # start_time = datetime.datetime(2023,11,7,16,10,0)
-    # end_time = datetime.datetime(2023,11,7,16,25,0)
-    # radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')    
-    # radar_feature.cal_feature([dir])
-    # save_name = "./npy/"+ start_time.strftime('%Y%m%d_%H%M%S')+"_"+end_time.strftime('%Y%m%d_%H%M%S')+"dir1_in1_data_"
-    # np.save(save_name+"normal.npy",radar_feature.feature_data_dict[dir])
-    # np.save(save_name+"time.npy",radar_feature.feature_time_dict[dir])
-
-    # dir =50
-    # start_time = datetime.datetime(2023,11,7,15,10,0)
-    # end_time = datetime.datetime(2023,11,7,15,25,0)
-    # radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')
-    # radar_feature.cal_feature([dir])
-    # save_name = "./npy/"+ start_time.strftime('%Y%m%d_%H%M%S')+"_"+end_time.strftime('%Y%m%d_%H%M%S')+ "dir"+str(int(dir//10))+"_"+"in"+str(dir%10)+"_data_"
-    # np.save(save_name+"normal.npy",radar_feature.feature_data_dict[dir])
-    # np.save(save_name+"time.npy",radar_feature.feature_time_dict[dir])
-
-
-
-    # dir =50
-    # start_time = datetime.datetime(2023,11,7,15,35,0)
-    # end_time = datetime.datetime(2023,11,7,15,55,0)
-    # radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')
-    # radar_feature.cal_feature([dir])
-    # save_name = "./npy/"+ start_time.strftime('%Y%m%d_%H%M%S')+"_"+end_time.strftime('%Y%m%d_%H%M%S')+ "dir"+str(int(dir//10))+"_"+"in"+str(dir%10)+"_data_"
-    # np.save(save_name+"acc.npy",radar_feature.feature_data_dict[dir])
-    # np.save(save_name+"time.npy",radar_feature.feature_time_dict[dir])
-
+    # for i in range(len(start_time_list)):
+    #     start_time = datetime.datetime.strptime(start_time_list[i],"%Y%m%d_%H%M%S")
+    #     end_time = datetime.datetime.strptime(end_time_list[i],"%Y%m%d_%H%M%S")
+    #     dir = dir_list[i]
+    #     is_acc = is_acc_list[i]
+    #     radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')
+    #     radar_feature.cal_feature([dir])
+    #     save_name = "./npy/"+ start_time.strftime('%Y%m%d_%H%M%S')+"_"+end_time.strftime('%Y%m%d_%H%M%S')+ "dir"+str(int(dir//10))+"_"+"in"+str(dir%10)+"_data_"
+    #     if is_acc==1:
+    #         np.save(save_name+"acc.npy",radar_feature.feature_data_dict[dir])
+    #     elif is_acc==0:
+    #         np.save(save_name+"normal.npy",radar_feature.feature_data_dict[dir])
+    #     elif is_acc==-1:
+    #         np.save(save_name+"inference.npy",radar_feature.feature_data_dict[dir])
+                    
+    #     np.save(save_name+"time.npy",radar_feature.feature_time_dict[dir])
     
 
 if __name__ == "__main__":
 
     main_get_npy_dataset()
+    # main_get_inference_tst_dataset_mp()
+    # main_get_npy_dataset()
     
-    read_dat_to_pkl("./data/mmAcc/5008/")
+    # read_dat_to_pkl("./data/mmAcc/5008/")
 #     start_time = datetime.datetime(2023,10,31,17,30,0)
 #     end_time = datetime.datetime(2023,10,31,18,0,0)
 #     display_the_origin_radar_data(start_time=start_time,end_time=end_time,path="./data/real/mmAcc/5008/pkl/")
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == "__main__-":
 
-    # frame_list = read_frames_from_file("./data/20231030_141514.dat")
-    # for frame in frame_list:
-    #     radar_dat = Radar_Dat()
-    #     radar_dat.decode(frame)
+    # pcatsne_display2([radar_feature4.feature_data_dict[11], radar_feature2.feature_data_dict[11]])
 
-
-    # read_dat_to_pkl("./data/real/mmAcc/5008/")
-    # start_time = datetime.datetime(2023,10,31,17,5,0)
-    # end_time = datetime.datetime(2023,10,31,17,25,0)
-    # radar_feature1 = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/real/mmAcc/5008/pkl/')
-    # radar_feature1.cal_feature([11])
-    # avg_MI=compute_avg_MI(radar_feature1.feature_data_dict[11])
-    # df_avg_MI = pd.DataFrame(avg_MI)
-    # print(df_avg_MI)
-    # read_dat_to_pkl("./data/real/mmAcc/5008/")
-    start_time = datetime.datetime(2023,10,31,17,5,0)
-    end_time = datetime.datetime(2023,10,31,17,25,0)
-    radar_feature3 = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')
-    radar_feature3.cal_feature([11])
-    np.save("acc1.npy",radar_feature3.feature_data_dict[11])
-
-    start_time = datetime.datetime(2023,10,31,17,35,0)
-    end_time = datetime.datetime(2023,10,31,17,55,0)
-    radar_feature2 = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')
-    radar_feature2.cal_feature([11])
-    np.save("normal2.npy",radar_feature2.feature_data_dict[11])
-
-    start_time = datetime.datetime(2023,11,1,17,30,0)
-    end_time = datetime.datetime(2023,11,1,17,50,0)
-    radar_feature4 = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/mmAcc/5008/pkl/')
-    radar_feature4.cal_feature([11])
-    np.save("normal1.npy",radar_feature4.feature_data_dict[11])
-
-    # start_time = datetime.datetime(2023,10,31,17,15,0)
-    # end_time = datetime.datetime(2023,10,31,17,25,0)
-    # radar_feature1 = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/real/mmAcc/5008/pkl/')
-    # radar_feature1.cal_feature([11])    
-
-    # start_time = datetime.datetime(2023,10,31,17,40,0)
-    # end_time = datetime.datetime(2023,10,31,17,50,0)
-    # radar_feature4 = Radar_Feature(start_time=start_time,end_time=end_time,path='./data/real/mmAcc/5008/pkl/')
-    # radar_feature4.cal_feature([11])    
-            # if len(self.feature_data_dict[1])>1000:
-    # tsne_display( np.concatenate(( radar_feature1.feature_data_dict[1], radar_feature2.feature_data_dict[1]),axis=0))
-    # pcatsne_display( np.concatenate(( radar_feature1.feature_data_dict[11], radar_feature2.feature_data_dict[11]),axis=0))
-    pcatsne_display2([radar_feature4.feature_data_dict[11], radar_feature2.feature_data_dict[11]])
-    # with open('radar_data_feature.pkl', 'wb') as file:
-    #     pickle.dump([radar_feature.feature_time_dict,radar_feature.feature_data_dict], file)
-
-    # with open('radar_data.pkl', 'rb') as file:
-    #     loaded_data = pickle.load(file)
-    # radar_feature.feature_time_dict={}
-    # radar_feature.feature_data_dict={}
     None
 
 
