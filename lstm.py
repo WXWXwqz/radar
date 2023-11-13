@@ -242,14 +242,14 @@ def main_test():
     print(f"Test Loss: {test_loss:.4f} - Test Accuracy: {test_accuracy * 100:.2f}% - 漏报: {false_negative_rate * 100:.2f}% - 误报: {false_positive_rate * 100:.2f}%")
     # print(f"Test Loss: {test_loss:.4f} - Test Accuracy: {test_accuracy * 100:.2f}%")
 
-if __name__ == "__main__":
+if __name__ == "__main__-":
     # start_time = datetime.datetime(2023,10,31,17,5,0)
     # end_time = datetime.datetime(2023,10,31,17,25,0)
     # get_npy_feature(start_time=datetime.datetime(2023,11,1,17,40,0),end_time=datetime.datetime(2023,11,1,17,45,0),save_names='normal4.npy',dir=52)
     main_inference_test()
     # main_test()
 
-if __name__ == "__main__-":   
+if __name__ == "__main__":   
     # x_data,y_data = get_npy_dataset(['acc.npy', 'normal.npy','acc1.npy','normal1.npy','normal3.npy','normal2.npy','acc4.npy','normal4.npy','20231107_151000_20231107_152500dir11_data_acc.npy'])
     npy_list = find_files_withend('./npy/','.npy')
     acc_npy_list = []
@@ -340,12 +340,13 @@ if __name__ == "__main__-":
 
     min_loss = float('inf')
     loss_threshold = 1e-4  # 设定您认为“明显”下降的损失阈�?
-    patience = 25  # 设定在停止前等待改善的时期数
+    patience = 2  # 设定在停止前等待改善的时期数
     trigger_times = 0  # 这将计算损失改善低于阈值的次数
 
     # 训练和测�?
     num_epochs = 500
-
+    print(X_train.shape)
+    model.load_state_dict(torch.load('./model/best_model.pkl'))
     for epoch in range(num_epochs):
         train_loss = train(model, train_loader, criterion, optimizer, device)
         test_loss, test_accuracy, false_negative_rate, false_positive_rate = test(model, test_loader, criterion, device)
@@ -367,10 +368,14 @@ if __name__ == "__main__-":
             best_model_name = f"./model/best_model_{current_time}_loss_{min_loss:.4f}_acc_{test_accuracy:.4f}.pkl"
             torch.save(model.state_dict(), best_model_name)
             torch.save(model.state_dict(), "./model/best_model.pkl")  # 保存另一份名为best
+            model.to('cpu')
             scripted_model = torch.jit.script(model)
 
             # 保存脚本化的模型
-            scripted_model.save("./model/best_model.pt")
+            # torch.load(python_model, map_location = 'cpu')
+            scripted_model.save("./model/best_model.pth")
+            input_shape = (1, 300,24)
+            torch.jit.trace(model,torch.rand(input_shape)).save('./model/jit_best_model.pth')
             print(f"训练早停，在第 {epoch+1} 个时期停止?")
             break
     # for epoch in range(num_epochs):
