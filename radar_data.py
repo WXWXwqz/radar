@@ -109,20 +109,20 @@ class Radar_Feature:
         
         self.feature_func_dict={}
         self.feature_func_dict['obj_num']=self.cal_feature_obj_num
-        self.feature_func_dict['obj_num_rate']=self.cal_feature_obj_num_rate
+        # self.feature_func_dict['obj_num_rate']=self.cal_feature_obj_num_rate
         self.feature_func_dict['obj_num_highspeed']=self.cal_feature_obj_num_high_speed
-        self.feature_func_dict['obj_num_highspeed_rate']=self.cal_feature_obj_num_high_speed_rate
+        # self.feature_func_dict['obj_num_highspeed_rate']=self.cal_feature_obj_num_high_speed_rate
         self.feature_func_dict['obj_num_lowspeed']=self.cal_feature_obj_num_low_speed
-        self.feature_func_dict['obj_num_lowspeed_rate']=self.cal_feature_obj_num_low_speed_rate
+        # self.feature_func_dict['obj_num_lowspeed_rate']=self.cal_feature_obj_num_low_speed_rate
         self.feature_func_dict['obj_avespeed']=self.cal_feature_ave_speed
         self.feature_func_dict['obj_aveaccX']=self.cal_feature_ave_accX
         self.feature_func_dict['obj_aveaccY']=self.cal_feature_ave_accY       
 
         self.feature_func_dict['obj_avexspeed']=self.cal_feature_ave_x_speed
         self.feature_func_dict['obj_aveyspeed']=self.cal_feature_ave_y_speed
-        self.feature_func_dict['obj_avespeed_rate']=self.cal_feature_ave_speed_rate
-        self.feature_func_dict['obj_avexspeed_rate']=self.cal_feature_ave_x_speed_rate
-        self.feature_func_dict['obj_aveyspeed_rate']=self.cal_feature_ave_y_speed_rate
+        # self.feature_func_dict['obj_avespeed_rate']=self.cal_feature_ave_speed_rate
+        # self.feature_func_dict['obj_avexspeed_rate']=self.cal_feature_ave_x_speed_rate
+        # self.feature_func_dict['obj_aveyspeed_rate']=self.cal_feature_ave_y_speed_rate
 
         self.feature_func_dict['obj_speed_std']=self.cal_feature_speed_std
         self.feature_func_dict['obj_xspeed_std']=self.cal_feature_x_speed_std
@@ -136,7 +136,7 @@ class Radar_Feature:
         self.feature_func_dict['lane_yspeed_std']=self.cal_feature_lane_yspeed_std
 
         self.feature_func_dict['lane_objnum_std']=self.cal_feature_lane_objnum_std
-        # self.feature_data_dict['is_lane_in']=self.cal_feature_lane_is_in
+        self.feature_data_dict['is_lane_in']=self.cal_feature_lane_is_in
         # self.feature_data_dict['lane_color']=self.cal_feature_lane_color
 
         
@@ -161,21 +161,36 @@ class Radar_Feature:
         # self.cal_feature([11,31,51,71])
         None
     
-    # def cal_feature_lane_color(self,s_index,dir):
-    #     re= []
-    #     seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-    #     for d in seque_data:
-    #         for lane in d.lane_info:
-    #             if lane.
-    #             if lane.no==dir:
-    #                 re.append(lane.color)        
+    def cal_feature_lane_color(self,s_index,dir):
 
-    # def cal_featrue_lane_is_in(self,s_index,dir):
-    #     re= []
-    #     seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-    #     for d in seque_data:
-    #         re.append(dir%10)    
-    #     return np.array(re).reshape(len(re),1)
+        lane_color_set={}
+        lane_color_set[1]=[1,2,3,4,5,22,23,24]
+        lane_color_set[2]=[6,7,8,14,17,18,19,20,21]
+        lane_light_color_set={}
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            for lane in d.lane_info:
+
+                for k,v in lane_color_set.items():
+
+                    if lane.no in v:
+                        if k not in lane_light_color_set.keys():
+                            lane_light_color_set[k]=[lane.color]
+                        else:
+                            lane_light_color_set[k].append(lane.color)
+
+                
+
+                if lane.no==dir:
+                    re.append(lane.color)        
+
+    def cal_featrue_lane_is_in(self,s_index,dir):
+        re= []
+        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
+        for d in seque_data:
+            re.append(dir%10)    
+        return np.array(re).reshape(len(re),1)
     
     def cal_feature_ave_speed(self,s_index,dir): 
         re= []
@@ -593,7 +608,7 @@ class Radar_Dat:
         self.sec = 0
         self.msec = 0        
         self.head_str=""
-        self.lane_info=[]
+        self.lane_info=[Lane_Info]
         self.obj_info:List[Obj_Info]=[]
         self.obj_x_coords=[]
         self.obj_y_coords=[]
@@ -1069,7 +1084,8 @@ def main_get_npy_dataset():
 
 if __name__ == "__main__":
 
-    main_get_npy_dataset()
+    None
+    # main_get_npy_dataset()
     # main_get_inference_tst_dataset_mp()
     # main_get_npy_dataset()
     

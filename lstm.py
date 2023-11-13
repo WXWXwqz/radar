@@ -6,7 +6,7 @@ import random
 from sklearn.utils import resample
 import datetime
 from radar_data import get_npy_dataset,get_npy_feature,Radar_Dat,Lane_Info,Obj_Info, find_files_withend  # 从radar_data.py中导入get_npy_dataset函数
-
+import re
 # 定义LSTM模型
 class LSTMBinaryClassifier(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
@@ -101,7 +101,7 @@ def test(model, test_loader, criterion, device, confidence_threshold=0.7):
 
     return total_loss / len(test_loader), accuracy, false_negative_rate, false_positive_rate
 
-def inference(model, test_loader, criterion, device,time_label, confidence_threshold=0.9):
+def inference(model, test_loader, criterion, device,time_label, file_name,confidence_threshold=0.9):
     model.eval()
     cnt =-1
     with torch.no_grad():
@@ -116,7 +116,7 @@ def inference(model, test_loader, criterion, device,time_label, confidence_thres
             # 计算混淆矩阵中的各项
             for predicted in confident_predictions:
 
-                print("cnt,{},time,{},predicted,{}".format(cnt,time_label[cnt],predicted.item()),file=open('inference_result.txt','a'))
+                print("cnt,{},time,{},predicted,{}".format(cnt,time_label[cnt],predicted.item()),file=open(file_name+'inference_result.txt','a'))
                 # print(cnt,time_label[cnt],predicted)
 
 
@@ -153,16 +153,21 @@ def main_inference_test():
             normal_npy_list.append(file)
         elif 'inference' in file:
             inference_npy_list.append(file)
-    inference_npy_list = ["./npy/20231107_150000_20231107_164000dir1_in1_data_inference.npy"]
+    # inference_npy_list = ["./npy/20231107_150000_20231107_164000dir1_in1_data_inference.npy"]
     for infer_file in inference_npy_list:
         # x_data = np.load(infer_file)
         x_data,y_data = get_npy_dataset([infer_file])
         infer_file_time = infer_file.replace('inference','time')
+        match = re.search(r"dir\d+_in\d+", infer_file)
+        dir_in = match.group(0)
+
         print(infer_file_time)
         time_label = np.load(infer_file_time)   
         X_test = torch.from_numpy(x_data).float()
         y_test = torch.from_numpy(y_data).long()
         test_dataset = TensorDataset(X_test, y_test)
+
+        
 
         batch_size = 1
         test_loader = DataLoader(test_dataset, batch_size=batch_size)
@@ -178,7 +183,7 @@ def main_inference_test():
         # model = torch.load('9932_model.pkl')
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-        inference(model, test_loader, criterion, device,time_label)
+        inference(model, test_loader, criterion, device,time_label,dir_in)
 
 
         # test_loss,test_accuracy,false_negative_rate, false_positive_rate= inference(model, test_loader, criterion, device,time_label)
@@ -237,14 +242,14 @@ def main_test():
     print(f"Test Loss: {test_loss:.4f} - Test Accuracy: {test_accuracy * 100:.2f}% - 漏报: {false_negative_rate * 100:.2f}% - 误报: {false_positive_rate * 100:.2f}%")
     # print(f"Test Loss: {test_loss:.4f} - Test Accuracy: {test_accuracy * 100:.2f}%")
 
-if __name__ == "__main__-":
+if __name__ == "__main__":
     # start_time = datetime.datetime(2023,10,31,17,5,0)
     # end_time = datetime.datetime(2023,10,31,17,25,0)
     # get_npy_feature(start_time=datetime.datetime(2023,11,1,17,40,0),end_time=datetime.datetime(2023,11,1,17,45,0),save_names='normal4.npy',dir=52)
     main_inference_test()
     # main_test()
 
-if __name__ == "__main__":   
+if __name__ == "__main__-":   
     # x_data,y_data = get_npy_dataset(['acc.npy', 'normal.npy','acc1.npy','normal1.npy','normal3.npy','normal2.npy','acc4.npy','normal4.npy','20231107_151000_20231107_152500dir11_data_acc.npy'])
     npy_list = find_files_withend('./npy/','.npy')
     acc_npy_list = []
