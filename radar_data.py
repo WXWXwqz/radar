@@ -98,7 +98,7 @@ class Obj_Info:
         self.vX = int.from_bytes(frame[65:67],byteorder='little',signed=True)
         self.vY = int.from_bytes(frame[67:69],byteorder='little',signed=True)
         self.accX = int.from_bytes(frame[69:71],byteorder='little',signed=True)
-        self.accY = int.from_bytes(frame[71:73],byteorder='little',signed=True)
+        self.axxY = int.from_bytes(frame[71:73],byteorder='little',signed=True)
         
         None
 
@@ -633,7 +633,7 @@ class Radar_Feature_CNN:
         self.feature_func_dict['lane_yspeed_std']=self.cal_feature_lane_yspeed_std
 
         self.feature_func_dict['lane_objnum_std']=self.cal_feature_lane_objnum_std
-        self.feature_data_dict['is_lane_in']=self.cal_feature_lane_is_in
+        # self.feature_data_dict['is_lane_in']=self.cal_feature_lane_is_in
         # self.feature_data_dict['lane_color']=self.cal_feature_lane_color
 
         
@@ -682,7 +682,7 @@ class Radar_Feature_CNN:
                 if lane.no==dir:
                     re.append(lane.color)        
 
-    def cal_featrue_lane_is_in(self,s_index,dir):
+    def cal_feature_lane_is_in(self,s_index,dir):
         re= []
         seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
         for d in seque_data:
@@ -690,61 +690,78 @@ class Radar_Feature_CNN:
         return np.array(re).reshape(len(re),1)
     
     def cal_feature_ave_speed(self,s_index,dir): 
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            obj_num =0 
-            obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
-            if len(obj_dir)==0:
+        re= []       
+        # seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]    
+        for i in range(self.feature_seque_len): 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            obj_speed =[] 
+            for d in seque_data:                
+                obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]                
+                obj_speed+=obj_dir
+            if len(obj_speed)==0:
                 re.append(0)
             else:
-                re.append(sum(obj_dir)/len(obj_dir))        
-        return np.array(re).reshape(len(re),1)
+                re.append(sum(obj_speed)/len(obj_speed))
+        return np.array(re).reshape(len(re),1)   
+
     def cal_feature_ave_accX(self,s_index,dir): 
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            obj_num =0 
-            obj_dir = [obj.accX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
-            if len(obj_dir)==0:
+        re= []       
+        # seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]    
+        for i in range(self.feature_seque_len): 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            obj_speed =[] 
+            for d in seque_data:                
+                obj_dir = [obj.accX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]                
+                obj_speed+=obj_dir
+            if len(obj_speed)==0:
                 re.append(0)
             else:
-                re.append(sum(obj_dir)/len(obj_dir))        
-        return np.array(re).reshape(len(re),1)
+                re.append(sum(obj_speed)/len(obj_speed))
+        return np.array(re).reshape(len(re),1) 
     def cal_feature_ave_accY(self,s_index,dir): 
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            obj_num =0 
-            obj_dir = [obj.accX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
-            if len(obj_dir)==0:
+        re= []       
+        # seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]    
+        for i in range(self.feature_seque_len): 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            obj_speed =[] 
+            for d in seque_data:                
+                obj_dir = [obj.axxY/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]                
+                obj_speed+=obj_dir
+            if len(obj_speed)==0:
                 re.append(0)
             else:
-                re.append(sum(obj_dir)/len(obj_dir))        
-        return np.array(re).reshape(len(re),1)
+                re.append(sum(obj_speed)/len(obj_speed))
+        return np.array(re).reshape(len(re),1) 
     def cal_feature_ave_x_speed(self,s_index,dir): 
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            obj_num =0 
-            obj_dir = [obj.vX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
-            if len(obj_dir)==0:
-                re.append(0)
+        re= []       
+        # seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]    
+        for i in range(self.feature_seque_len): 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            obj_speed =[] 
+            for d in seque_data:                
+                obj_dir = [obj.vX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]                
+                obj_speed+=obj_dir
+            if len(obj_speed)==0:
+                re.append(0)                
             else:
-                re.append(sum(obj_dir)/len(obj_dir))        
-        return np.array(re).reshape(len(re),1)
+                re.append(sum(obj_speed)/len(obj_speed))
+        return np.array(re).reshape(len(re),1) 
 
     def cal_feature_ave_y_speed(self,s_index,dir): 
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            obj_num =0 
-            obj_dir = [obj.vY/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
-            if len(obj_dir)==0:
+        re= []       
+        # seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]    
+        for i in range(self.feature_seque_len): 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            obj_speed =[] 
+            for d in seque_data:                
+                obj_dir = [obj.vY/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]                
+                obj_speed+=obj_dir
+            if len(obj_speed)==0:
                 re.append(0)
             else:
-                re.append(sum(obj_dir)/len(obj_dir))        
-        return np.array(re).reshape(len(re),1)
+                re.append(sum(obj_speed)/len(obj_speed))
+                
+        return np.array(re).reshape(len(re),1) 
 
 
     def cal_feature_ave_speed_rate(self,s_index,dir):    
@@ -807,39 +824,49 @@ class Radar_Feature_CNN:
 
 
 
-    def cal_feature_speed_std(self,s_index,dir):   #标准�??
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            obj_num =0 
-            obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
-            if len(obj_dir)==0:
+    def cal_feature_speed_std(self,s_index,dir):   #标准
+        re= []       
+        # seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]    
+        for i in range(self.feature_seque_len): 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            obj_speed =[] 
+            for d in seque_data:                
+                obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]                
+                obj_speed+=obj_dir
+            if len(obj_speed)==0:
                 re.append(0)
             else:
-                re.append(np.std(obj_dir))        
-        return np.array(re).reshape(len(re),1)
+                re.append(np.std(obj_speed))
+        return np.array(re).reshape(len(re),1) 
+
     def cal_feature_x_speed_std(self,s_index,dir):   #标准�??
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            obj_num =0 
-            obj_dir = [obj.vX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
-            if len(obj_dir)==0:
+        re= []       
+        # seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]    
+        for i in range(self.feature_seque_len): 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            obj_speed =[] 
+            for d in seque_data:                
+                obj_dir = [obj.vX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]                
+                obj_speed+=obj_dir
+            if len(obj_speed)==0:
                 re.append(0)
             else:
-                re.append(np.std(obj_dir))        
-        return np.array(re).reshape(len(re),1)
+                re.append(np.std(obj_speed))
+        return np.array(re).reshape(len(re),1) 
     def cal_feature_y_speed_std(self,s_index,dir):   #标准�??
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            obj_num =0 
-            obj_dir = [obj.vY/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�??1km/h 或�?1m/s
-            if len(obj_dir)==0:
+        re= []       
+        # seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]    
+        for i in range(self.feature_seque_len): 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            obj_speed =[] 
+            for d in seque_data:                
+                obj_dir = [obj.vY/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]                
+                obj_speed+=obj_dir
+            if len(obj_speed)==0:
                 re.append(0)
             else:
-                re.append(np.std(obj_dir))        
-        return np.array(re).reshape(len(re),1)
+                re.append(np.std(obj_speed))
+        return np.array(re).reshape(len(re),1) 
     def cal_feature_obj_num(self,s_index,dir):        
         re= []       
         # seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]    
@@ -865,15 +892,18 @@ class Radar_Feature_CNN:
             rePreN.append(len(obj_dir_preN))   
         return (np.array(re)-np.array(rePreN)).reshape(len(re),1)
 
-    def cal_feature_obj_num_high_speed(self,s_index,dir):        
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
+    def cal_feature_obj_num_high_speed(self,s_index,dir):
+        re= []       
+        # seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]    
+        for i in range(self.feature_seque_len): 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
             obj_num =0 
-            obj_dir = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
-            obj_dir_highspeed = [obj for obj in obj_dir if obj.speed>self.speed_th]
-            re.append(len(obj_dir_highspeed))        
-        return np.array(re).reshape(len(re),1)
+            for d in seque_data:                
+                obj_dir = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+                obj_dir_highspeed = [obj for obj in obj_dir if obj.speed>self.speed_th]
+                obj_num += len(obj_dir_highspeed)
+            re.append(obj_num)        
+        return np.array(re).reshape(len(re),1)        
 
     def cal_feature_obj_num_high_speed_rate(self,s_index,dir):        
         re= []
@@ -888,15 +918,18 @@ class Radar_Feature_CNN:
             rePreN.append(len(obj_dir_preN))   
         return (np.array(re)-np.array(rePreN)).reshape(len(re),1)
 
-    def cal_feature_obj_num_low_speed(self,s_index,dir):        
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
+    def cal_feature_obj_num_low_speed(self,s_index,dir):   
+        re= []       
+        # seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]    
+        for i in range(self.feature_seque_len): 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
             obj_num =0 
-            obj_dir = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
-            obj_dir_highspeed = [obj for obj in obj_dir if obj.speed<=self.speed_th]
-            re.append(len(obj_dir_highspeed))        
-        return np.array(re).reshape(len(re),1)
+            for d in seque_data:                
+                obj_dir = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+                obj_dir_highspeed = [obj for obj in obj_dir if obj.speed<=self.speed_th]
+                obj_num += len(obj_dir_highspeed)
+            re.append(obj_num)        
+        return np.array(re).reshape(len(re),1)       
 
     def cal_feature_obj_num_low_speed_rate(self,s_index,dir):        
         re= []
@@ -910,128 +943,143 @@ class Radar_Feature_CNN:
             obj_dir_preN = [obj for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10) and obj.speed<=self.speed_th]
             rePreN.append(len(obj_dir_preN))   
         return (np.array(re)-np.array(rePreN)).reshape(len(re),1)
-    def cal_feature_avg_nearest_X_dist(self,s_index,dir): 
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            obj_num =0 
-            obj_dir = [obj.x/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #距离转换为m
-            obj_dir_closest = find_closest_numbers(obj_dir)  
-            if len(obj_dir)==0:
+    def cal_feature_avg_nearest_X_dist(self,s_index,dir):
+        re= []         
+        for i in range(self.feature_seque_len): 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            obj_list = [] 
+            for d in seque_data:                
+                obj_dir = [obj.x/100  for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+                obj_list+=obj_dir
+            obj_dir_closest = find_closest_numbers(obj_list) 
+            if len(obj_list)==0:
                 re.append(0)
-            elif len(obj_dir)==1:
+            elif len(obj_list)==1:
                 re.append(100)
             else:
-                re.append(sum(obj_dir_closest)/len(obj_dir_closest))        
-        return np.array(re).reshape(len(re),1)
+                re.append(sum(obj_dir_closest)/len(obj_dir_closest))                    
+        return np.array(re).reshape(len(re),1)    
     
     def cal_feature_avg_nearest_Y_dist(self,s_index,dir): 
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            obj_num =0 
-            obj_dir = [obj.y/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #距离转换为m
-            obj_dir_closest = find_closest_numbers(obj_dir)  
-            if len(obj_dir)==0:
+        re= []         
+        for i in range(self.feature_seque_len): 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            obj_list = [] 
+            for d in seque_data:                
+                obj_dir = [obj.y/100  for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+                obj_list+=obj_dir
+            obj_dir_closest = find_closest_numbers(obj_list) 
+            if len(obj_list)==0:
                 re.append(0)
-            elif len(obj_dir)==1:
+            elif len(obj_list)==1:
                 re.append(100)
             else:
-                re.append(sum(obj_dir_closest)/len(obj_dir_closest))        
-        return np.array(re).reshape(len(re),1)
+                re.append(sum(obj_dir_closest)/len(obj_dir_closest))                    
+        return np.array(re).reshape(len(re),1)  
 
     def cal_feature_avg_nearest_XY_dist(self,s_index,dir): 
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            obj_num =0 
-            obj_dir = [(obj.y/100*obj.y/100*+obj.x/100*obj.x/100)**0.5 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #距离转换为m
-            obj_dir_closest = find_closest_numbers(obj_dir)  
-            if len(obj_dir)==0:
+        re= []         
+        for i in range(self.feature_seque_len): 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            obj_list = [] 
+            for d in seque_data:                
+                obj_dir = [(obj.y/100*obj.y/100*+obj.x/100*obj.x/100)**0.5 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)]
+                obj_list+=obj_dir
+            obj_dir_closest = find_closest_numbers(obj_list) 
+            if len(obj_list)==0:
                 re.append(0)
-            elif len(obj_dir)==1:
+            elif len(obj_list)==1:
                 re.append(100)
             else:
-                re.append(sum(obj_dir_closest)/len(obj_dir_closest))        
-        return np.array(re).reshape(len(re),1)
-    def cal_feature_lane_speed_std(self,s_index,dir): 
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            lane_speed_dict={}
-            for obj in d.obj_info:
-                if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10):
-                    if obj.obj_lanenum not in lane_speed_dict.keys():
-                        lane_speed_dict[obj.obj_lanenum] = [obj.speed/100]
-                    else:
-                        lane_speed_dict[obj.obj_lanenum].append(obj.speed/100)
+                re.append(sum(obj_dir_closest)/len(obj_dir_closest))                    
+        return np.array(re).reshape(len(re),1)  
+
+    def cal_feature_lane_speed_std(self,s_index,dir):
+        re= []                
+        for i in range(self.feature_seque_len): 
+            lane_speed_dict={} 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            for d in seque_data:
+                for obj in d.obj_info:
+                    if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10):
+                        if obj.obj_lanenum not in lane_speed_dict.keys():
+                            lane_speed_dict[obj.obj_lanenum] = [obj.speed/100]
+                        else:
+                            lane_speed_dict[obj.obj_lanenum].append(obj.speed/100)
+            
             each_lane_avgspeed=[]
             for lane_speed in lane_speed_dict.values():
-                each_lane_avgspeed.append(sum(lane_speed)/len(lane_speed))
+                each_lane_avgspeed.append(sum(lane_speed)/len(lane_speed))                
             if len(each_lane_avgspeed)==0:
                 re.append(0)
             else:
-                re.append(np.std(each_lane_avgspeed))  
-        return np.array(re).reshape(len(re),1)
+                re.append(np.std(each_lane_avgspeed)) 
+        return np.array(re).reshape(len(re),1)        
+    
     def cal_feature_lane_xspeed_std(self,s_index,dir): 
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            lane_speed_dict={}
-            for obj in d.obj_info:
-                if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10):
-                    if obj.obj_lanenum not in lane_speed_dict.keys():
-                        lane_speed_dict[obj.obj_lanenum] = [obj.vX/100]
-                    else:
-                        lane_speed_dict[obj.obj_lanenum].append(obj.vX/100)
+        re= []                
+        for i in range(self.feature_seque_len): 
+            lane_speed_dict={} 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            for d in seque_data:
+                for obj in d.obj_info:
+                    if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10):
+                        if obj.obj_lanenum not in lane_speed_dict.keys():
+                            lane_speed_dict[obj.obj_lanenum] = [obj.vX/100]
+                        else:
+                            lane_speed_dict[obj.obj_lanenum].append(obj.vX/100)
+            
             each_lane_avgspeed=[]
             for lane_speed in lane_speed_dict.values():
-                each_lane_avgspeed.append(sum(lane_speed)/len(lane_speed))
+                each_lane_avgspeed.append(sum(lane_speed)/len(lane_speed))                
             if len(each_lane_avgspeed)==0:
                 re.append(0)
             else:
-                re.append(np.std(each_lane_avgspeed))  
-        return np.array(re).reshape(len(re),1)
-
+                re.append(np.std(each_lane_avgspeed)) 
+        return np.array(re).reshape(len(re),1)     
+        
     def cal_feature_lane_yspeed_std(self,s_index,dir): 
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-            lane_speed_dict={}
-            for obj in d.obj_info:
-                if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10):
-                    if obj.obj_lanenum not in lane_speed_dict.keys():
-                        lane_speed_dict[obj.obj_lanenum] = [obj.vY/100]
-                    else:
-                        lane_speed_dict[obj.obj_lanenum].append(obj.vY/100)
+        re= []                
+        for i in range(self.feature_seque_len): 
+            lane_speed_dict={} 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            for d in seque_data:
+                for obj in d.obj_info:
+                    if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10):
+                        if obj.obj_lanenum not in lane_speed_dict.keys():
+                            lane_speed_dict[obj.obj_lanenum] = [obj.vY/100]
+                        else:
+                            lane_speed_dict[obj.obj_lanenum].append(obj.vY/100)
+            
             each_lane_avgspeed=[]
             for lane_speed in lane_speed_dict.values():
-                each_lane_avgspeed.append(sum(lane_speed)/len(lane_speed))
+                each_lane_avgspeed.append(sum(lane_speed)/len(lane_speed))                
             if len(each_lane_avgspeed)==0:
                 re.append(0)
             else:
-                re.append(np.std(each_lane_avgspeed))  
-        return np.array(re).reshape(len(re),1)
+                re.append(np.std(each_lane_avgspeed)) 
+        return np.array(re).reshape(len(re),1)     
     def cal_feature_lane_objnum_std(self,s_index,dir): 
-        re= []
-        seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
-        for d in seque_data:
-
-            lane_num_dict={}
-            for obj in d.obj_info:
-                if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10):
-                    if obj.obj_lanenum not in lane_num_dict.keys():
-                        lane_num_dict[obj.obj_lanenum] = 1
-                    else:
-                        lane_num_dict[obj.obj_lanenum]+=1
+        re= []                
+        for i in range(self.feature_seque_len): 
+            lane_speed_dict={} 
+            seque_data = self.raw_data[s_index+i*self.feature_seque_offset:s_index+self.feature_seque_offset*(i+1)]
+            for d in seque_data:
+                for obj in d.obj_info:
+                    if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10):
+                        if obj.obj_lanenum not in lane_speed_dict.keys():
+                            lane_speed_dict[obj.obj_lanenum] = 1
+                        else:
+                            lane_speed_dict[obj.obj_lanenum] +=1
+            
             each_lane_avgspeed=[]
-            for lane_obj_num in lane_num_dict.values():
-                each_lane_avgspeed.append(lane_obj_num)
+            for lane_speed in lane_speed_dict.values():
+                each_lane_avgspeed.append(lane_speed)                
             if len(each_lane_avgspeed)==0:
                 re.append(0)
             else:
-                re.append(np.std(each_lane_avgspeed))  
-        return np.array(re).reshape(len(re),1)
+                re.append(np.std(each_lane_avgspeed)) 
+        return np.array(re).reshape(len(re),1)    
 
     def cal_feature(self,dirs):        
         index = self.index  
@@ -1489,7 +1537,7 @@ def process_radar_data(start_time, end_time, dir, is_acc):
     start_time = datetime.datetime.strptime(start_time, "%Y%m%d_%H%M%S")
     end_time = datetime.datetime.strptime(end_time, "%Y%m%d_%H%M%S")
     
-    radar_feature = Radar_Feature(start_time=start_time, end_time=end_time, path='./data/mmAcc/5008/pkl/')
+    radar_feature = Radar_Feature_CNN(start_time=start_time, end_time=end_time, path='./data/mmAcc/5008/pkl/')
     radar_feature.cal_feature([dir])
     
     save_name = f"./npy/{start_time.strftime('%Y%m%d_%H%M%S')}_{end_time.strftime('%Y%m%d_%H%M%S')}dir{int(dir//10)}_in{dir%10}_data_"
@@ -1545,25 +1593,30 @@ def main_get_inference_tst_dataset():
 
 def main_get_npy_dataset():
 
-    # start_time_list=["20231107_151000","20231107_154500","20231107_153500","20231107_150000","20231107_155500","20231107_152500","20231107_152500","20231107_161500"]
-    # end_time_list=  ["20231107_152500","20231107_171000","20231107_155000","20231107_152500","20231107_160500","20231107_154000","20231107_154000","20231107_163000"]
-    # dir_list=       [11,                11,               50,               50,               51,               51,               10,               10              ] 
-    # is_acc_list=    [1,                  0,               1,                0,                1,                0,                0,                 1              ]
+    start_time_list=["20231107_151000","20231107_154500","20231107_153500","20231107_150000","20231107_155500","20231107_152500","20231107_152500","20231107_161500"]
+    end_time_list=  ["20231107_152500","20231107_171000","20231107_155000","20231107_152500","20231107_160500","20231107_154000","20231107_154000","20231107_163000"]
+    dir_list=       [11,                11,               50,               50,               51,               51,               10,               10              ] 
+    is_acc_list=    [1,                  0,               1,                0,                1,                0,                0,                 1              ]
 
-    start_time_list = ["20231106_080000","20231106_080000","20231106_080000","20231106_080000"]
-    end_time_list =   ["20231106_090000","20231106_090000","20231106_090000","20231106_090000"] 
-    dir_list = [ 11,10, 51, 50]
-    is_acc_list = [0,0,0,0]
+    # start_time_list = ["20231106_080000","20231106_080000","20231106_080000","20231106_080000"]
+    # end_time_list =   ["20231106_090000","20231106_090000","20231106_090000","20231106_090000"] 
+    # dir_list = [ 11,10, 51, 50]
+    # is_acc_list = [0,0,0,0]
     
     processes = []
     
-    for i in range(len(start_time_list)):
-        p = Process(target=process_radar_data, args=(start_time_list[i], end_time_list[i], dir_list[i], is_acc_list[i]))
-        processes.append(p)
-        p.start()
+    for i in range(2,len(start_time_list)):
+        process_radar_data(start_time_list[i], end_time_list[i], dir_list[i], is_acc_list[i])
+
+    # # for i in range(len(start_time_list)):
+    # for i in range(1):
+    #     i=1
+    #     p = Process(target=process_radar_data, args=(start_time_list[i], end_time_list[i], dir_list[i], is_acc_list[i]))
+    #     processes.append(p)
+    #     p.start()
     
-    for p in processes:
-        p.join()
+    # for p in processes:
+    #     p.join()
 
 
     # for i in range(len(start_time_list)):
@@ -1587,7 +1640,7 @@ def main_get_npy_dataset():
 if __name__ == "__main__":
 
     None
-    # main_get_npy_dataset()
+    main_get_npy_dataset()
     # main_get_inference_tst_dataset_mp()
     # main_get_npy_dataset()
     
