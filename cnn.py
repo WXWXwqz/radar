@@ -7,28 +7,47 @@ from sklearn.utils import resample
 import datetime
 from radar_data import get_npy_dataset,get_npy_feature,Radar_Dat,Lane_Info,Obj_Info, find_files_withend  # 从radar_data.py中导入get_npy_dataset函数
 import re
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
+class Simple1DCNN(nn.Module):
+    def __init__(self):
+        super(Simple1DCNN, self).__init__()
+        self.conv1 = nn.Conv1d(in_channels=1, out_channels=64, kernel_size=3)
+        self.pool = nn.MaxPool1d(kernel_size=2)
+        self.conv2 = nn.Conv1d(in_channels=64, out_channels=128, kernel_size=3)
+        self.fc1 = nn.Linear(in_features=20480, out_features=256)  # 158是经过两次卷积和池化后的特征长度
+        self.fc2 = nn.Linear(in_features=256, out_features=2)
+
+    def forward(self, x):
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = torch.flatten(x, 1)  # 扁平化特征图
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
 
 class LeNet5(nn.Module):
     def __init__(self):
         super(LeNet5, self).__init__()
         self.layer1 = nn.Sequential(
-            nn.Conv1d(1, 3, kernel_size=16),
+            nn.Conv1d(1, 9, kernel_size=16),
             # nn.BatchNorm1d(8),
             nn.ReLU(inplace=True),
-            nn.MaxPool1d(kernel_size=32, stride=2))
+            nn.MaxPool1d(kernel_size=16, stride=2))
         self.layer2 = nn.Sequential(
-            nn.Conv1d(3, 6, kernel_size=16),
+            nn.Conv1d(9, 18, kernel_size=32),
             # nn.BatchNorm1d(16),
             nn.ReLU(inplace=True),
-            nn.MaxPool1d(kernel_size=32, stride=2))
+            nn.MaxPool1d(kernel_size=16, stride=2))
         self.layer3 = nn.Sequential(
-            nn.Conv1d(6, 12, kernel_size=16),
+            nn.Conv1d(18, 36, kernel_size=32),
             # nn.BatchNorm1d(32),
             nn.ReLU(inplace=True),
             nn.MaxPool1d(kernel_size=32, stride=2))
         self.fc = nn.Sequential(
-            nn.Linear(168, 84),
+            nn.Linear(1260, 84),
             # nn.ReLU(inplace=True),
             # nn.Linear(1024,64),
             nn.ReLU(inplace=True),
@@ -40,7 +59,7 @@ class LeNet5(nn.Module):
         x = self.layer3(x)
         # print(x.shape)
         x = x.view(x.size(0), -1)  # 第二次卷积的输出拉伸为一行
-        # print(x.shape)
+        # print(x.shape)maf
         x = self.fc(x)
         return x
     
@@ -58,7 +77,7 @@ def train(model, train_loader, criterion, optimizer, device):
         total_loss += loss.item()
 
     return total_loss / len(train_loader)
-def test(model, test_loader, criterion, device, confidence_threshold=0.7):
+def test(model, test_loader, criterion, device, confidence_threshold=0.5):
     model.eval()
     total_loss = 0.0
     correct = 0
@@ -328,7 +347,10 @@ if __name__ == "__main__":
     y_train = torch.from_numpy(y_train).long()
     X_test = torch.from_numpy(X_test).float()
     y_test = torch.from_numpy(y_test).long()
+
+    print("X_train shape before reshape",X_train.shape)
     X_train = X_train.reshape(X_train.shape[0],1,-1)
+    print("X_train shape after reshape",X_train.shape)
     X_test = X_test.reshape(X_test.shape[0],1,-1)
     train_dataset = TensorDataset( X_train, y_train)
     test_dataset = TensorDataset(X_test, y_test)
@@ -345,12 +367,12 @@ if __name__ == "__main__":
     num_layers = 2
     output_size = 2
     # model = LSTMBinaryClassifier(input_size, hidden_size, num_layers, output_size).to(device)
-    model = LeNet5().to(device)
+    model = Simple1DCNN().to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.007)
 
     min_loss = float('inf')
-    loss_threshold = 1e-4  # 设定您认为“明显”下降的损失阈�?
+    loss_threshold = 1e-4  # 设定您认为“明显”下降的损失阈
     patience = 20  # 设定在停止前等待改善的时期数
     trigger_times = 0  # 这将计算损失改善低于阈值的次数
 
@@ -376,17 +398,17 @@ if __name__ == "__main__":
             
             # 当有更好的模型时保存
             current_time = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-            best_model_name = f"./model/best_model_{current_time}_loss_{min_loss:.4f}_acc_{test_accuracy:.4f}.pkl"
+            best_model_name = f"./model/cnn_best_model_{current_time}_loss_{min_loss:.4f}_acc_{test_accuracy:.4f}.pkl"
             torch.save(model.state_dict(), best_model_name)
-            torch.save(model.state_dict(), "./model/best_model.pkl")  # 保存另一份名为best
+            torch.save(model.state_dict(), "./model/cnn_best_model.pkl")  # 保存另一份名为best
             model.to('cpu')
             scripted_model = torch.jit.script(model)
 
             # 保存脚本化的模型
             # torch.load(python_model, map_location = 'cpu')
-            scripted_model.save("./model/best_model.pth")
-            # input_shape = (1, 300,24)
-            # torch.jit.trace(model,torch.rand(input_shape)).save('./model/jit_best_model.pth')
+            scripted_model.save("./model/cnn_best_model.pth")
+            input_shape = X_train.shape
+            torch.jit.trace(model,torch.rand(input_shape)).save('./model/cnn_jit_best_model.pth')
             print(f"训练早停，在第 {epoch+1} 个时期停止?")
             break
     # for epoch in range(num_epochs):

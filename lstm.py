@@ -12,28 +12,16 @@ class LSTMBinaryClassifier(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
         super(LSTMBinaryClassifier, self).__init__()
         self.hidden_size = hidden_size
-        self.num_layers = num_layers
-
-        # LSTM�?
+        self.num_layers = num_layers  
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-
-        # 全连接层
         self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
-        # 初始化LSTM的隐藏状�?
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-
-        # 前向传播
-        out, _ = self.lstm(x, (h0, c0))
-        
-        # 取LSTM输出的最后一个时间步
+        out, _ = self.lstm(x, (h0, c0))        
         out = out[:, -1, :]
-
-        # 全连接层
         out = self.fc(out)
-
         return out
 # 训练函数
 def train(model, train_loader, criterion, optimizer, device):
@@ -335,18 +323,21 @@ if __name__ == "__main__":
     num_layers = 2
     output_size = 2
     model = LSTMBinaryClassifier(input_size, hidden_size, num_layers, output_size).to(device)
+
+    onxx_model = torch.onnx.export(model,torch.rand((1,X_train.shape[1],X_train.shape[2])).to(device), './model/onxx_model.onnx', verbose=True)
+
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     min_loss = float('inf')
     loss_threshold = 1e-4  # 设定您认为“明显”下降的损失阈�?
-    patience = 2  # 设定在停止前等待改善的时期数
+    patience = 20  # 设定在停止前等待改善的时期数
     trigger_times = 0  # 这将计算损失改善低于阈值的次数
 
     # 训练和测�?
     num_epochs = 500
     print(X_train.shape)
-    model.load_state_dict(torch.load('./model/best_model.pkl'))
+    # model.load_state_dict(torch.load('./model/best_model.pkl'))
     for epoch in range(num_epochs):
         train_loss = train(model, train_loader, criterion, optimizer, device)
         test_loss, test_accuracy, false_negative_rate, false_positive_rate = test(model, test_loader, criterion, device)
@@ -374,7 +365,8 @@ if __name__ == "__main__":
             # 保存脚本化的模型
             # torch.load(python_model, map_location = 'cpu')
             scripted_model.save("./model/best_model.pth")
-            input_shape = (1, 300,24)
+            # input_shape = (1, 300,24)
+            input_shape = (1,X_train.shape[1],X_train.shape[2])
             torch.jit.trace(model,torch.rand(input_shape)).save('./model/jit_best_model.pth')
             print(f"训练早停，在第 {epoch+1} 个时期停止?")
             break
