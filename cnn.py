@@ -10,53 +10,40 @@ import re
 
 
 class LeNet5(nn.Module):
-    def __init__(self, num_classes=2):
+    def __init__(self):
         super(LeNet5, self).__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(1, 6, kernel_size=5, stride=1),
+        self.layer1 = nn.Sequential(
+            nn.Conv1d(1, 3, kernel_size=16),
+            # nn.BatchNorm1d(8),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(6, 16, kernel_size=5, stride
-
-class AlexNet(nn.Module):
-    def __init__(self, num_classes=2):
-        super(AlexNet, self).__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
+            nn.MaxPool1d(kernel_size=32, stride=2))
+        self.layer2 = nn.Sequential(
+            nn.Conv1d(3, 6, kernel_size=16),
+            # nn.BatchNorm1d(16),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.MaxPool1d(kernel_size=32, stride=2))
+        self.layer3 = nn.Sequential(
+            nn.Conv1d(6, 12, kernel_size=16),
+            # nn.BatchNorm1d(32),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2),
-        )
-class LSTMBinaryClassifier(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, output_size):
-        super(LSTMBinaryClassifier, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-
-        # LSTM�?
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-
-        # 全连接层
-        self.fc = nn.Linear(hidden_size, output_size)
+            nn.MaxPool1d(kernel_size=32, stride=2))
+        self.fc = nn.Sequential(
+            nn.Linear(168, 84),
+            # nn.ReLU(inplace=True),
+            # nn.Linear(1024,64),
+            nn.ReLU(inplace=True),
+            nn.Linear(84, 2))
 
     def forward(self, x):
-        # 初始化LSTM的隐藏状�?
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-
-        # 前向传播
-        out, _ = self.lstm(x, (h0, c0))
-        
-        # 取LSTM输出的最后一个时间步
-        out = out[:, -1, :]
-
-        # 全连接层
-        out = self.fc(out)
-
-        return out
-# 训练函数
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        # print(x.shape)
+        x = x.view(x.size(0), -1)  # 第二次卷积的输出拉伸为一行
+        # print(x.shape)
+        x = self.fc(x)
+        return x
+    
 def train(model, train_loader, criterion, optimizer, device):
     model.train()
     total_loss = 0.0
@@ -341,6 +328,8 @@ if __name__ == "__main__":
     y_train = torch.from_numpy(y_train).long()
     X_test = torch.from_numpy(X_test).float()
     y_test = torch.from_numpy(y_test).long()
+    X_train = X_train.reshape(X_train.shape[0],1,-1)
+    X_test = X_test.reshape(X_test.shape[0],1,-1)
     train_dataset = TensorDataset( X_train, y_train)
     test_dataset = TensorDataset(X_test, y_test)
 
@@ -355,19 +344,20 @@ if __name__ == "__main__":
     hidden_size = 64
     num_layers = 2
     output_size = 2
-    model = LSTMBinaryClassifier(input_size, hidden_size, num_layers, output_size).to(device)
+    # model = LSTMBinaryClassifier(input_size, hidden_size, num_layers, output_size).to(device)
+    model = LeNet5().to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
     min_loss = float('inf')
     loss_threshold = 1e-4  # 设定您认为“明显”下降的损失阈�?
-    patience = 2  # 设定在停止前等待改善的时期数
+    patience = 20  # 设定在停止前等待改善的时期数
     trigger_times = 0  # 这将计算损失改善低于阈值的次数
 
     # 训练和测�?
     num_epochs = 500
     print(X_train.shape)
-    model.load_state_dict(torch.load('./model/best_model.pkl'))
+    # model.load_state_dict(torch.load('./model/best_model.pkl'))
     for epoch in range(num_epochs):
         train_loss = train(model, train_loader, criterion, optimizer, device)
         test_loss, test_accuracy, false_negative_rate, false_positive_rate = test(model, test_loader, criterion, device)
@@ -395,8 +385,8 @@ if __name__ == "__main__":
             # 保存脚本化的模型
             # torch.load(python_model, map_location = 'cpu')
             scripted_model.save("./model/best_model.pth")
-            input_shape = (1, 300,24)
-            torch.jit.trace(model,torch.rand(input_shape)).save('./model/jit_best_model.pth')
+            # input_shape = (1, 300,24)
+            # torch.jit.trace(model,torch.rand(input_shape)).save('./model/jit_best_model.pth')
             print(f"训练早停，在第 {epoch+1} 个时期停止?")
             break
     # for epoch in range(num_epochs):

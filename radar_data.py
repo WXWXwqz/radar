@@ -645,8 +645,8 @@ class Radar_Feature_CNN:
 
 
         self.feature_dim = len(self.feature_name)
-        self.feature_seque_len = 24  # 24个特征组成一个数据
-        self.feature_seque_offset = 5 #  5 帧算一个特征
+        self.feature_seque_len = 36  # 24个特征组成一个数据
+        self.feature_seque_offset = 3 #  5 帧算一个特征
 
         self.raw_data_file_name=[]
         self.raw_data:List[Radar_Dat] = self.get_raw_data(path)
@@ -1605,18 +1605,18 @@ def main_get_npy_dataset():
     
     processes = []
     
-    for i in range(2,len(start_time_list)):
-        process_radar_data(start_time_list[i], end_time_list[i], dir_list[i], is_acc_list[i])
+    # for i in range(2,len(start_time_list)):
+    #     process_radar_data(start_time_list[i], end_time_list[i], dir_list[i], is_acc_list[i])
 
-    # # for i in range(len(start_time_list)):
+    for i in range(len(start_time_list)):
     # for i in range(1):
-    #     i=1
-    #     p = Process(target=process_radar_data, args=(start_time_list[i], end_time_list[i], dir_list[i], is_acc_list[i]))
-    #     processes.append(p)
-    #     p.start()
+        i=1
+        p = Process(target=process_radar_data, args=(start_time_list[i], end_time_list[i], dir_list[i], is_acc_list[i]))
+        processes.append(p)
+        p.start()
     
-    # for p in processes:
-    #     p.join()
+    for p in processes:
+        p.join()
 
 
     # for i in range(len(start_time_list)):
