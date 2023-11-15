@@ -1812,8 +1812,18 @@ def main_generate_image_inference_dataset():
     end_time_list = ["20231107_164000", "20231107_164000","20231107_164000", "20231107_164000"]
     dir_list = [11, 10, 51, 50]
     is_acc_list = [2, 2, 2, 2]
+
+    processes = []    
     for i in range(len(start_time_list)):
-        genetare_image(start_time_list[i], end_time_list[i],"./data/mmAcc/5008/pkl/", dir_list[i], is_acc_list[i],save_dir='./data/img_dataset/inference/')
+        p = Process(target=genetare_image, args=(start_time_list[i], end_time_list[i],"./data/mmAcc/5008/pkl/", dir_list[i], is_acc_list[i],'./data/img_dataset/inference/'))
+        processes.append(p)
+        p.start()
+    
+    for p in processes:
+        p.join()
+        
+    # for i in range(len(start_time_list)):
+    #     genetare_image(start_time_list[i], end_time_list[i],"./data/mmAcc/5008/pkl/", dir_list[i], is_acc_list[i],save_dir='./data/img_dataset/inference/')
         
 def main_generate_image_dataset():
     start_time_list=["20231107_151000","20231107_154500","20231107_153500","20231107_150000","20231107_155500","20231107_152500","20231107_152500","20231107_161500"]
