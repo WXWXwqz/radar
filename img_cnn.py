@@ -167,6 +167,6 @@ def main():
 
 if __name__ == "__main__":
     net = SimpleCNN()
-    # net.load_state_dict(torch.load('./cnn/best_model.pth'))
-    # inference_test(net=net,folder_path='./data/img_dataset/inference',output_file='./cnn/result.txt')
-    main()
+    net.load_state_dict(torch.load('./cnn/best_model.pth'))
+    inference_test(net=net,folder_path='./data/img_dataset/inference',output_file='./cnn/result.txt')
+    # main()
