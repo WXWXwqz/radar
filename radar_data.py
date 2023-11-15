@@ -583,7 +583,7 @@ class Radar_Feature:
         current_time = pre_time
         raw_data=[]
         while current_time <= self.end_time:
-            print(current_time)
+            # print(current_time)
             pkl_file = path+current_time.strftime('%Y%m%d_%H')+'.pkl'
             self.raw_data_file_name.append(pkl_file)            
             current_time += datetime.timedelta(hours=1)
@@ -1681,40 +1681,152 @@ def main_get_npy_dataset():
     #         np.save(save_name+"inference.npy",radar_feature.feature_data_dict[dir])
                     
     #     np.save(save_name+"time.npy",radar_feature.feature_time_dict[dir])
+def update_image_within_N(image, x, y, N,value):
+    rows, cols = image.shape
+    for xi in range(x - N, x + N + 1):
+        for yj in range(y - N, y + N + 1):
+            # 确保坐标在图像范围内
+            if 0 <= xi < rows and 0 <= yj < cols:
+                # 检查是否满足距离条件
+                if abs(xi - x) <= N or abs(yj - y) <= N:
+                    image[xi, yj] += value
+
+def update_image(image, x, y):
+    # 确保坐标在图像范围内
+    rows, cols = image.shape
+    image[x, y] += 8
+    for i in range(-1, 2):
+        for j in range(-1, 2):
+            # 计算相邻像素的坐标
+            xi = x + i
+            yj = y + j
+            # 检查坐标是否在图像边界内
+            if 0 <= xi < rows and 0 <= yj < cols:
+                # 对于中心点及其直接相邻点增加 2
+                image[xi, yj] += 4
+                # 遍历中心点相邻点的相邻点
+                for ii in range(-1, 2):
+                    for jj in range(-1, 2):
+                        # 计算次级相邻像素的坐标
+                        xii = xi + ii
+                        yjj = yj + jj
+                        # 检查坐标是否在图像边界内
+                        if 0 <= xii < rows and 0 <= yjj < cols:
+                            # 为次级相邻点增加 1
+                            image[xii, yjj] += 2
+
+def normalize_coordinates(list_x, list_y, X1, Y1):
+    min_x, max_x = min(list_x), max(list_x)
+    min_y, max_y = min(list_y), max(list_y)
+
+    scale_factor_x = X1 / (max_x - min_x)
+    scale_factor_y = Y1 / (max_y - min_y)
+
+    normalized_x = [(x - min_x) * scale_factor_x for x in list_x]
+    normalized_y = [(y - min_y) * scale_factor_y for y in list_y]
+
+    return normalized_x, normalized_y
+
+def genetare_image(start_time,end_time,path,dir,label):
+    start_time = datetime.datetime.strptime(start_time, "%Y%m%d_%H%M%S")
+    end_time = datetime.datetime.strptime(end_time, "%Y%m%d_%H%M%S")
+    check_time = start_time
+    while True:
+        check_time = check_time+datetime.timedelta(seconds=1)
+        check_time2_end = check_time+datetime.timedelta(minutes=2)
+        if check_time>end_time:
+            break
+        radar_feature = Radar_Feature(start_time=start_time,end_time=check_time2_end,path=path)
+        x_label = []
+        y_label = []
+        speed =[]
+        # x_speed = []
+        # y_speed = []        
+        for frame in radar_feature.raw_data[radar_feature.index:radar_feature.indexend]:
+            obj_info = [obj for obj in frame.obj_info if (obj.radar_dir == dir//10 and obj.obj_lanenum!=255 and obj.is_in_lane==dir%10)]
+            obj_x_coords = [obj.x for obj in obj_info]
+            obj_y_coords = [obj.y for obj in obj_info]
+            obj_speed = [obj.speed for obj in obj_info]
+            # obj_x_speed = [obj.vX for obj in obj_info]
+            # obj_y_speed = [obj.vY for obj in obj_info]
+            # x_speed += obj_x_speed
+            # y_speed += obj_y_speed
+            speed+=obj_speed
+            x_label+=obj_x_coords
+            y_label+=obj_y_coords
+        normalized_x, normalized_y = normalize_coordinates(x_label, y_label, 360, 360)
+        image = np.zeros((360, 360), dtype=np.float16)  
+        for i in range(len(normalized_x)):
+            x=int(normalized_x[i])
+            y=int(normalized_y[i])
+            v = abs(speed[i]/100)
+            update_image_within_N(image, y, x, 7,v)
+        normalized_image = (image - np.min(image)) / (np.max(image) - np.min(image)) * 255
+        normalized_image = normalized_image.astype(np.uint8)
+        os.makedirs('./data/img_dataset/',exist_ok=True)
+        s_time = check_time.strftime('%Y%m%d_%H%M%S')
+        e_time = check_time2_end.strftime('%Y%m%d_%H%M%S')
+        print('./data/img_dataset/'+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+'_.png')
+        plt.imsave('./data/img_dataset/'+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+'_.png', normalized_image, cmap='gray')  
+
+
+def main_generate_image_dataset():
+    start_time_list=["20231107_151000","20231107_154500","20231107_153500","20231107_150000","20231107_155500","20231107_152500","20231107_152500","20231107_161500"]
+    end_time_list=  ["20231107_152500","20231107_171000","20231107_155000","20231107_152500","20231107_160500","20231107_154000","20231107_154000","20231107_163000"]
+    dir_list=       [11,                11,               50,               50,               51,               51,               10,               10              ] 
+    is_acc_list=    [1,                  0,               1,                0,                1,                0,                0,                 1              ]
+    for i in range(len(start_time_list)):
+        genetare_image(start_time_list[i], end_time_list[i],"./data/mmAcc/5008/pkl/", dir_list[i], is_acc_list[i])
+
 def creat_img(start_time,end_time,path,dir,label):
     radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path=path)
     x_label = []
     y_label = []
+    speed =[]
+    x_speed = []
+    y_speed = []   
 
     
     for frame in radar_feature.raw_data[radar_feature.index:radar_feature.indexend]:
-        obj_info = [obj for obj in frame.obj_info if (obj.radar_dir == dir and obj.obj_lanenum!=255)]
+        obj_info = [obj for obj in frame.obj_info if (obj.radar_dir == dir//10 and obj.obj_lanenum!=255 and obj.is_in_lane==dir%10)]
         obj_x_coords = [obj.x for obj in obj_info]
         obj_y_coords = [obj.y for obj in obj_info]
+        obj_speed = [obj.speed for obj in obj_info]
+        obj_x_speed = [obj.vX for obj in obj_info]
+        obj_y_speed = [obj.vY for obj in obj_info]
+        x_speed += obj_x_speed
+        y_speed += obj_y_speed
+        speed+=obj_speed
         x_label+=obj_x_coords
         y_label+=obj_y_coords
 
-    image = np.zeros((250, 350), dtype=np.uint8)
+    normalized_x, normalized_y = normalize_coordinates(x_label, y_label, 360, 360)
 
-    for i in range(len(x_label)):
-        x = int((x_label[i]-5000)/10)
-        x/=10
-        x=int(x)
-        y = (y_label[i]+3000)
-        y/=10
-        y=int(y)
-        image[x, y] += 2
+    image = np.zeros((360, 360), dtype=np.float16)
+
+    for i in range(len(normalized_x)):
+        # x = int((x_label[i]-5000)/10)
+        # x/=10
+        x=int(normalized_x[i])
+        # y = (y_label[i]+3000)
+        # y/=10
+        y=int(normalized_y[i])
+        # image[x, y] += 2
+        # update_image(image, x, y)
+        v = abs(speed[i]/100)
+        update_image_within_N(image, y, x, 7,v)
     normalized_image = (image - np.min(image)) / (np.max(image) - np.min(image)) * 255
 
     # 将数据类型转换为uint8
     normalized_image = normalized_image.astype(np.uint8)
-    plt.imsave('output_image.png', normalized_image, cmap='gray')
+    plt.imsave(label+'output_image.png', normalized_image, cmap='gray')
     # plt.imshow(normalized_image, cmap='gray')
     # plt.colorbar()
     # plt.savefig(f"./fig/tst.png")
 
 if __name__ == "__main__":
 
+    main_generate_image_dataset()
     # None
     # main_get_npy_dataset()
     # main_get_inference_tst_dataset_mp()
@@ -1722,10 +1834,11 @@ if __name__ == "__main__":
     
     # read_dat_to_pkl("./data/mmAcc/5008/")
 
-    check_time = datetime.datetime(2023,11,7,15,0,0)
-    end_time = datetime.datetime(2023,11,7,16,40,30)
-    check_time2_end = check_time+datetime.timedelta(minutes=2)
-    creat_img(check_time,check_time2_end,"./data/mmAcc/5008/pkl/",1,label='tst2')
+    # check_time = datetime.datetime(2023,11,7,15,12,0)
+    # end_time = datetime.datetime(2023,11,7,16,40,30)
+    # check_time2_end = check_time+datetime.timedelta(minutes=1)
+    # creat_img(check_time,check_time2_end,"./data/mmAcc/5008/pkl/",11,label='tst_acc1_')
+    
     # while True:
     #     check_time = check_time+datetime.timedelta(seconds=1)
     #     if check_time>end_time:
