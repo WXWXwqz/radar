@@ -46,18 +46,25 @@ def get_images_and_labels(root_dir):
 class SimpleCNN(nn.Module):
     def __init__(self):
         super(SimpleCNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, 3, padding=1)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(64 * 90 * 90, 128)
-        self.fc2 = nn.Linear(128, 2)
+        self.conv1 = nn.Conv2d(1, 3, 5)  # 输入通道1，输出通道6，卷积核大小5
+        self.pool = nn.MaxPool2d(2, 2)   # 池化层
+        self.conv2 = nn.Conv2d(3, 6, 5) # 输入通道6，输出通道16，卷积核大小5
+        self.conv3 = nn.Conv2d(6, 9, 5) # 输入通道6，输出通道16，卷积核大小5
+        self.conv4 = nn.Conv2d(9, 12, 5) # 输入通道6，输出通道16，卷积核大小5
+        # 减小全连接层的尺寸
+        self.fc1 = nn.Linear(12*18*18, 16)  # 第一个全连接层
+        # self.fc2 = nn.Linear(64, 32)            # 第二个全连接层
+        self.fc3 = nn.Linear(16, 2)             # 第三个全连接层，输出层
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 64 * 90 * 90)
+        x = self.pool(F.relu(self.conv3(x)))
+        x = self.pool(F.relu(self.conv4(x)))
+        x = x.view(x.shape[0], -1)  # 展平操作，用于全连接层
         x = F.relu(self.fc1(x))
-        x = self.fc2(x)
+        # x = F.relu(self.fc2(x))
+        x = self.fc3(x)
         return x
 
 # 训练函数
@@ -160,6 +167,6 @@ def main():
 
 if __name__ == "__main__":
     net = SimpleCNN()
-    net.load_state_dict(torch.load('./cnn/best_model.pth'))
-    inference_test(net=net,folder_path='./data/img_dataset/inference',output_file='./cnn/result.txt')
-    # main()
+    # net.load_state_dict(torch.load('./cnn/best_model.pth'))
+    # inference_test(net=net,folder_path='./data/img_dataset/inference',output_file='./cnn/result.txt')
+    main()
