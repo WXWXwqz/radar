@@ -1681,7 +1681,37 @@ def main_get_npy_dataset():
     #         np.save(save_name+"inference.npy",radar_feature.feature_data_dict[dir])
                     
     #     np.save(save_name+"time.npy",radar_feature.feature_time_dict[dir])
+def creat_img(start_time,end_time,path,dir,label):
+    radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path=path)
+    x_label = []
+    y_label = []
+
     
+    for frame in radar_feature.raw_data[radar_feature.index:radar_feature.indexend]:
+        obj_info = [obj for obj in frame.obj_info if (obj.radar_dir == dir and obj.obj_lanenum!=255)]
+        obj_x_coords = [obj.x for obj in obj_info]
+        obj_y_coords = [obj.y for obj in obj_info]
+        x_label+=obj_x_coords
+        y_label+=obj_y_coords
+
+    image = np.zeros((250, 350), dtype=np.uint8)
+
+    for i in range(len(x_label)):
+        x = int((x_label[i]-5000)/10)
+        x/=10
+        x=int(x)
+        y = (y_label[i]+3000)
+        y/=10
+        y=int(y)
+        image[x, y] += 2
+    normalized_image = (image - np.min(image)) / (np.max(image) - np.min(image)) * 255
+
+    # 将数据类型转换为uint8
+    normalized_image = normalized_image.astype(np.uint8)
+    plt.imsave('output_image.png', normalized_image, cmap='gray')
+    # plt.imshow(normalized_image, cmap='gray')
+    # plt.colorbar()
+    # plt.savefig(f"./fig/tst.png")
 
 if __name__ == "__main__":
 
@@ -1692,21 +1722,22 @@ if __name__ == "__main__":
     
     # read_dat_to_pkl("./data/mmAcc/5008/")
 
-    start_time = datetime.datetime(2023,11,7,15,0,0)
+    check_time = datetime.datetime(2023,11,7,15,0,0)
     end_time = datetime.datetime(2023,11,7,16,40,30)
-    
-    while True:
-        check_time = start_time+datetime.timedelta(seconds=1)
-        if check_time>end_time:
-            break
-        check_time2_end = check_time+datetime.timedelta(minutes=2)
-        check_time4_end = check_time+datetime.timedelta(minutes=4)
+    check_time2_end = check_time+datetime.timedelta(minutes=2)
+    creat_img(check_time,check_time2_end,"./data/mmAcc/5008/pkl/",1,label='tst2')
+    # while True:
+    #     check_time = check_time+datetime.timedelta(seconds=1)
+    #     if check_time>end_time:
+    #         break
+    #     check_time2_end = check_time+datetime.timedelta(minutes=2)
+    #     check_time4_end = check_time+datetime.timedelta(minutes=4)
 
-        display_the_history_trace(check_time,check_time2_end,"./data/mmAcc/5008/pkl/",1,label='tst2')
-        display_the_history_trace(check_time,check_time4_end,"./data/mmAcc/5008/pkl/",1,label='tst4')
-        display_the_history_trace(check_time,check_time2_end,"./data/mmAcc/5008/pkl/",5,label='tst2')
-        display_the_history_trace(check_time,check_time4_end,"./data/mmAcc/5008/pkl/",5,label='tst4')
-    # display_the_origin_radar_data1(start_time=start_time,end_time=end_time,path="./data/mmAcc/5008/pkl/")
+    #     display_the_history_trace(check_time,check_time2_end,"./data/mmAcc/5008/pkl/",1,label='tst2')
+    #     display_the_history_trace(check_time,check_time4_end,"./data/mmAcc/5008/pkl/",1,label='tst4')
+    #     display_the_history_trace(check_time,check_time2_end,"./data/mmAcc/5008/pkl/",5,label='tst2')
+    #     display_the_history_trace(check_time,check_time4_end,"./data/mmAcc/5008/pkl/",5,label='tst4')
+    # # display_the_origin_radar_data1(start_time=start_time,end_time=end_time,path="./data/mmAcc/5008/pkl/")
 
 
 
