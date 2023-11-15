@@ -11,6 +11,7 @@ from sklearn.decomposition import PCA
 from sklearn.feature_selection import mutual_info_regression
 from sklearn.metrics import mutual_info_score
 import pandas as pd
+import time
 from multiprocessing import Process
 
 def get_npy_dataset(dateset_list):
@@ -85,7 +86,7 @@ class Obj_Info:
         self.stop_num = frame[48]
         self.paking_delay = int.from_bytes(frame[49:51],byteorder='little')
         self.obj_status = frame[51]
-        self.is_in_lane = frame[52]  #1 进口�?? 0 出口�??
+        self.is_in_lane = frame[52]  #1 进口�??? 0 出口�???
         self.track_source = frame[53]
         self.video_dir = frame[54]
         self.video_id = frame[55]
@@ -93,7 +94,7 @@ class Obj_Info:
         self.video_obj_id = int.from_bytes(frame[57:59],byteorder='little')
         self.radar_obj_id = int.from_bytes(frame[59:61],byteorder='little')
         self.obj_flux = frame[61]   #目标转向
-        self.obj_lanenum = frame[62]  #车道�?
+        self.obj_lanenum = frame[62]  #车道�??
         self.RCS = int.from_bytes(frame[63:65],byteorder='little')
         self.vX = int.from_bytes(frame[65:67],byteorder='little',signed=True)
         self.vY = int.from_bytes(frame[67:69],byteorder='little',signed=True)
@@ -153,7 +154,11 @@ class Radar_Feature:
         self.feature_seque_offset = 5 # 1s 间隔进行数据偏移
         
         self.raw_data_file_name=[]
+        start_timet = time.time()  
         self.raw_data:List[Radar_Dat] = self.get_raw_data(path)
+        end_timet = time.time()  
+        execution_time = end_timet - start_timet          
+        # print(f"执行时间001: {execution_time} 秒")
         self.raw_data_time = [item.time for item in self.raw_data]
         self.feature_time_dict={}
         self.feature_data_dict={}
@@ -198,7 +203,7 @@ class Radar_Feature:
         seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
         for d in seque_data:
             obj_num =0 
-            obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�???1km/h 或�?1m/s
+            obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�????1km/h 或�?1m/s
             if len(obj_dir)==0:
                 re.append(0)
             else:
@@ -209,7 +214,7 @@ class Radar_Feature:
         seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
         for d in seque_data:
             obj_num =0 
-            obj_dir = [obj.accX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�???1km/h 或�?1m/s
+            obj_dir = [obj.accX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�????1km/h 或�?1m/s
             if len(obj_dir)==0:
                 re.append(0)
             else:
@@ -220,7 +225,7 @@ class Radar_Feature:
         seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
         for d in seque_data:
             obj_num =0 
-            obj_dir = [obj.accX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�???1km/h 或�?1m/s
+            obj_dir = [obj.accX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�????1km/h 或�?1m/s
             if len(obj_dir)==0:
                 re.append(0)
             else:
@@ -231,7 +236,7 @@ class Radar_Feature:
         seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
         for d in seque_data:
             obj_num =0 
-            obj_dir = [obj.vX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�???1km/h 或�?1m/s
+            obj_dir = [obj.vX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�????1km/h 或�?1m/s
             if len(obj_dir)==0:
                 re.append(0)
             else:
@@ -243,7 +248,7 @@ class Radar_Feature:
         seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
         for d in seque_data:
             obj_num =0 
-            obj_dir = [obj.vY/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�???1km/h 或�?1m/s
+            obj_dir = [obj.vY/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�????1km/h 或�?1m/s
             if len(obj_dir)==0:
                 re.append(0)
             else:
@@ -311,34 +316,34 @@ class Radar_Feature:
 
 
 
-    def cal_feature_speed_std(self,s_index,dir):   #标准�???
+    def cal_feature_speed_std(self,s_index,dir):   #标准�????
         re= []
         seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
         for d in seque_data:
             obj_num =0 
-            obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�???1km/h 或�?1m/s
+            obj_dir = [obj.speed/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�????1km/h 或�?1m/s
             if len(obj_dir)==0:
                 re.append(0)
             else:
                 re.append(np.std(obj_dir))        
         return np.array(re).reshape(len(re),1)
-    def cal_feature_x_speed_std(self,s_index,dir):   #标准�???
+    def cal_feature_x_speed_std(self,s_index,dir):   #标准�????
         re= []
         seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
         for d in seque_data:
             obj_num =0 
-            obj_dir = [obj.vX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�???1km/h 或�?1m/s
+            obj_dir = [obj.vX/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�????1km/h 或�?1m/s
             if len(obj_dir)==0:
                 re.append(0)
             else:
                 re.append(np.std(obj_dir))        
         return np.array(re).reshape(len(re),1)
-    def cal_feature_y_speed_std(self,s_index,dir):   #标准�???
+    def cal_feature_y_speed_std(self,s_index,dir):   #标准�????
         re= []
         seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]        
         for d in seque_data:
             obj_num =0 
-            obj_dir = [obj.vY/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�???1km/h 或�?1m/s
+            obj_dir = [obj.vY/100 for obj in d.obj_info if (obj.radar_dir==dir//10 and obj.is_in_lane==dir%10)] #速度转换�????1km/h 或�?1m/s
             if len(obj_dir)==0:
                 re.append(0)
             else:
@@ -594,8 +599,10 @@ class Radar_Feature:
             if not os.path.exists(pkl_file):
                 continue
             with open(pkl_file, 'rb') as file:
+                
                 loaded_data = pickle.load(file)
-                raw_data = raw_data+loaded_data    
+                raw_data = raw_data+loaded_data   
+                print(pkl_file) 
         return raw_data    
 
 class Radar_Feature_CNN:
@@ -645,8 +652,8 @@ class Radar_Feature_CNN:
 
 
         self.feature_dim = len(self.feature_name)
-        self.feature_seque_len = 36  # 24个特征组成一个数�?
-        self.feature_seque_offset = 3 #  5 帧算一个特�?
+        self.feature_seque_len = 36  # 24个特征组成一个数�??
+        self.feature_seque_offset = 3 #  5 帧算一个特�??
 
         self.raw_data_file_name=[]
         self.raw_data:List[Radar_Dat] = self.get_raw_data(path)
@@ -839,7 +846,7 @@ class Radar_Feature_CNN:
                 re.append(np.std(obj_speed))
         return np.array(re).reshape(len(re),1) 
 
-    def cal_feature_x_speed_std(self,s_index,dir):   #标准�???
+    def cal_feature_x_speed_std(self,s_index,dir):   #标准�????
         re= []       
         # seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]    
         for i in range(self.feature_seque_len): 
@@ -853,7 +860,7 @@ class Radar_Feature_CNN:
             else:
                 re.append(np.std(obj_speed))
         return np.array(re).reshape(len(re),1) 
-    def cal_feature_y_speed_std(self,s_index,dir):   #标准�???
+    def cal_feature_y_speed_std(self,s_index,dir):   #标准�????
         re= []       
         # seque_data = self.raw_data[s_index:s_index+self.feature_seque_len]    
         for i in range(self.feature_seque_len): 
@@ -1175,7 +1182,7 @@ class Radar_Dat:
         self.hour = frame[3+12]
         self.min = frame[4+12]
         self.sec = frame[5+12]
-        self.msec = int.from_bytes(frame[6+12:12+8], byteorder='little')  # 小端字节�???
+        self.msec = int.from_bytes(frame[6+12:12+8], byteorder='little')  # 小端字节�????
         self.time = datetime.datetime(year=self.year,month=self.month,day=self.day,hour=self.hour,minute=self.min,second=self.sec,microsecond=self.msec*1000)
         self.lane_num=frame[20]
         self.lane_len=frame[21]
@@ -1205,7 +1212,7 @@ class Radar_Dat:
             obj_x_coords=[obj.x for obj in obj_info]
             obj_y_coords=[obj.y for obj in obj_info]
             plt.scatter(obj_x_coords,obj_y_coords)
-            # 为每个点标注其坐�???
+            # 为每个点标注其坐�????
             for point in obj_info:
                 plt.annotate(f"({point.x}, {point.y})", (point.x, point.y))
 
@@ -1271,7 +1278,7 @@ def read_frames_from_file(filename):
             byte = file.read(1)
             
             if not byte:
-                # 文件结束时，如果缓冲区中有数据，将其作为最后一帧存�???
+                # 文件结束时，如果缓冲区中有数据，将其作为最后一帧存�????
                 if buffer:
                     frames.append(buffer)
                 break
@@ -1284,18 +1291,18 @@ def read_frames_from_file(filename):
                     # if cnt>10:
                     #     break
                     frames.append(buffer[:-12])  # 保存当前缓冲区中的数据，不包括新找到的标识符
-                    buffer = buffer[-12:]  # 保留新找到的标识符作为下一个帧的开�???
+                    buffer = buffer[-12:]  # 保留新找到的标识符作为下一个帧的开�????
     
     return frames
 
 def read_dat_file(filename):
     with open(filename, 'rb') as file:
-        # 假设每次都读�???4个字节，即一个int值（仅为示例�???
+        # 假设每次都读�????4个字节，即一个int值（仅为示例�????
         while True:
-            data = file.read(12)  # 读取4个字�???
+            data = file.read(12)  # 读取4个字�????
             if not data:
                 break
-            # 假设是little-endian的整�???
+            # 假设是little-endian的整�????
             str_radar_code  = data.decode()
             value = int.from_bytes(data, byteorder='little')
             # value = str.from
@@ -1355,7 +1362,7 @@ def tsne_display(data):
     tsne = TSNE(n_components=2, random_state=42)
     data_tsne = tsne.fit_transform(data_reshaped)
 
-    # 可视�???
+    # 可视�????
     plt.figure(figsize=(10, 6))
     plt.scatter(data_tsne[:, 0], data_tsne[:, 1], alpha=0.5)
     plt.title("t-SNE visualization of the data")
@@ -1367,21 +1374,21 @@ def pcatsne_display1(data1, data2):
     # 合并数据
     merged_data = np.concatenate((data1, data2), axis=0)
 
-    # 1. 重塑数据�??? (N, 4200)
+    # 1. 重塑数据�???? (N, 4200)
     data_reshaped = merged_data.reshape(merged_data.shape[0], -1)
 
     # 2. 使用PCA进行初步降维
     pca = PCA(n_components=50)
     data_pca = pca.fit_transform(data_reshaped)
 
-    # 3. 使用t-SNE进一步降�???
+    # 3. 使用t-SNE进一步降�????
     tsne = TSNE(n_components=2, random_state=42)
     data_tsne = tsne.fit_transform(data_pca)
 
     # 4. 为两个数据集分配颜色
     colors = ['red'] * len(data1) + ['blue'] * len(data2)
 
-    # 5. 可视�???
+    # 5. 可视�????
     plt.figure(figsize=(10, 6))
     plt.scatter(data_tsne[:, 0], data_tsne[:, 1], c=colors, alpha=0.5)
     plt.title("t-SNE visualization of the data")
@@ -1396,11 +1403,11 @@ def pcatsne_display(data):
     pca = PCA(n_components=50)
     data_pca = pca.fit_transform(data_reshaped)
 
-    # 3. 使用t-SNE进一步降�???
+    # 3. 使用t-SNE进一步降�????
     tsne = TSNE(n_components=2, random_state=42)
     data_tsne = tsne.fit_transform(data_pca)
 
-    # 4. 可视�???
+    # 4. 可视�????
     plt.figure(figsize=(10, 6))
     plt.scatter(data_tsne[:, 0], data_tsne[:, 1], alpha=0.5)
     plt.title("t-SNE visualization of the data")
@@ -1412,8 +1419,8 @@ def MI_cal(data):
     MI_values = []
 
     for t in range(data.shape[1]):
-        X = data[:, t, 0].reshape(-1, 1)  # �???1个特�???
-        Y = data[:, t, 1]                 # �???2个特�???
+        X = data[:, t, 0].reshape(-1, 1)  # �????1个特�????
+        Y = data[:, t, 1]                 # �????2个特�????
         MI = mutual_info_regression(X, Y)
         MI_values.append(MI[0])
     print(MI_values)
@@ -1423,7 +1430,7 @@ def pcatsne_display2(data_list):
     # 1. 合并数据
     merged_data = np.concatenate(data_list, axis=0)
 
-    # 2. 重塑数据�??? (N, 4200)
+    # 2. 重塑数据�???? (N, 4200)
     data_reshaped = merged_data.reshape(merged_data.shape[0], -1)
 
     # 3. 使用PCA进行初步降维
@@ -1437,7 +1444,7 @@ def pcatsne_display2(data_list):
     # 5. 生成颜色列表
     colors = plt.cm.rainbow(np.linspace(0, 1, len(data_list)))
     
-    # 6. 可视�???
+    # 6. 可视�????
     plt.figure(figsize=(10, 6))
     start_idx = 0
     for i, data in enumerate(data_list):
@@ -1467,7 +1474,7 @@ def pcatsne_display2(data_list):
 
 
 # def compute_avg_MI(data):
-#     N, T, F = data.shape  # 获取数据的形状，其中T应该�???300，F应该�???14
+#     N, T, F = data.shape  # 获取数据的形状，其中T应该�????300，F应该�????14
 #     MI_matrices = []
 
 #     for t in range(T):
@@ -1486,7 +1493,7 @@ def mutual_information(x, y, bins=30):
     return mi
 
 def compute_avg_MI(data):
-    N, T, F = data.shape  # 获取数据的形�???
+    N, T, F = data.shape  # 获取数据的形�????
     MI_matrices = []
 
     for t in range(T):
@@ -1687,7 +1694,7 @@ def update_image_within_N(image, x, y, N,value):
         for yj in range(y - N, y + N + 1):
             # 确保坐标在图像范围内
             if 0 <= xi < rows and 0 <= yj < cols:
-                # 检查是否满足距离条件
+                # 检查是否满足距离条�?
                 if abs(xi - x) <= N or abs(yj - y) <= N:
                     image[xi, yj] += value
 
@@ -1697,20 +1704,20 @@ def update_image(image, x, y):
     image[x, y] += 8
     for i in range(-1, 2):
         for j in range(-1, 2):
-            # 计算相邻像素的坐标
+            # 计算相邻像素的坐�?
             xi = x + i
             yj = y + j
-            # 检查坐标是否在图像边界内
+            # 检查坐标是否在图像边界�?
             if 0 <= xi < rows and 0 <= yj < cols:
                 # 对于中心点及其直接相邻点增加 2
                 image[xi, yj] += 4
                 # 遍历中心点相邻点的相邻点
                 for ii in range(-1, 2):
                     for jj in range(-1, 2):
-                        # 计算次级相邻像素的坐标
+                        # 计算次级相邻像素的坐�?
                         xii = xi + ii
                         yjj = yj + jj
-                        # 检查坐标是否在图像边界内
+                        # 检查坐标是否在图像边界�?
                         if 0 <= xii < rows and 0 <= yjj < cols:
                             # 为次级相邻点增加 1
                             image[xii, yjj] += 2
@@ -1726,23 +1733,45 @@ def normalize_coordinates(list_x, list_y, X1, Y1):
     normalized_y = [(y - min_y) * scale_factor_y for y in list_y]
 
     return normalized_x, normalized_y
+def update_image_within_N_optimized(image, x, y, N, value):
+    rows, cols = image.shape
+    # 计算更新区域的边�?
+    x_min = max(x - N, 0)
+    x_max = min(x + N + 1, rows)
+    y_min = max(y - N, 0)
+    y_max = min(y + N + 1, cols)
+
+    # 创建一个掩码，表示需要更新的区域
+    mask = np.zeros_like(image, dtype=bool)
+    mask[x_min:x_max, y_min:y_max] = True
+
+    # 使用掩码更新图像
+    image[mask] += value
 
 def genetare_image(start_time,end_time,path,dir,label):
     start_time = datetime.datetime.strptime(start_time, "%Y%m%d_%H%M%S")
     end_time = datetime.datetime.strptime(end_time, "%Y%m%d_%H%M%S")
+    radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path=path)
     check_time = start_time
     while True:
         check_time = check_time+datetime.timedelta(seconds=1)
         check_time2_end = check_time+datetime.timedelta(minutes=2)
         if check_time>end_time:
             break
-        radar_feature = Radar_Feature(start_time=start_time,end_time=check_time2_end,path=path)
+        start_timet = time.time()  
+        # radar_feature = Radar_Feature(start_time=start_time,end_time=check_time2_end,path=path)
+        index_s = bisect.bisect(radar_feature.raw_data_time,check_time)
+        index_e = bisect.bisect(radar_feature.raw_data_time,check_time2_end)
+        end_timet = time.time()  
+        execution_time = end_timet - start_timet          
+        # print(f"执行时间0: {execution_time} 秒")
         x_label = []
         y_label = []
         speed =[]
         # x_speed = []
-        # y_speed = []        
-        for frame in radar_feature.raw_data[radar_feature.index:radar_feature.indexend]:
+        # y_speed = []      
+        start_timet = time.time()  
+        for frame in radar_feature.raw_data[index_s:index_e]:
             obj_info = [obj for obj in frame.obj_info if (obj.radar_dir == dir//10 and obj.obj_lanenum!=255 and obj.is_in_lane==dir%10)]
             obj_x_coords = [obj.x for obj in obj_info]
             obj_y_coords = [obj.y for obj in obj_info]
@@ -1754,13 +1783,22 @@ def genetare_image(start_time,end_time,path,dir,label):
             speed+=obj_speed
             x_label+=obj_x_coords
             y_label+=obj_y_coords
+        end_timet = time.time()  
+        execution_time = end_timet - start_timet          
+        # print(f"执行时间: {execution_time} 秒")
+        
         normalized_x, normalized_y = normalize_coordinates(x_label, y_label, 360, 360)
+
         image = np.zeros((360, 360), dtype=np.float16)  
+        start_timet = time.time() 
         for i in range(len(normalized_x)):
             x=int(normalized_x[i])
             y=int(normalized_y[i])
             v = abs(speed[i]/100)
-            update_image_within_N(image, y, x, 7,v)
+            update_image_within_N_optimized(image, y, x, 7,v)
+        end_timet = time.time()  
+        execution_time = end_timet - start_timet          
+        # print(f"执行时间1: {execution_time} 秒")
         normalized_image = (image - np.min(image)) / (np.max(image) - np.min(image)) * 255
         normalized_image = normalized_image.astype(np.uint8)
         os.makedirs('./data/img_dataset/',exist_ok=True)
