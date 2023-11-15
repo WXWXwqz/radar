@@ -105,6 +105,32 @@ def test_model(net, test_loader):
     if 100 * correct / total > 99.0:
         torch.save(net.state_dict(), './cnn/best_model.pth')
 
+def inference_test(net, folder_path, output_file):
+    net.to(device)
+    net.eval()
+    
+    transform = transforms.Compose([
+        transforms.Resize((360, 360)),
+        transforms.ToTensor()
+    ])
+
+    # 获取文件夹中的所有图片文件名并排序
+    image_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
+    image_files.sort()
+
+    with open(output_file, 'w') as f:
+        for img_file in image_files:
+            img_path = os.path.join(folder_path, img_file)
+            image = Image.open(img_path).convert('L')
+            image = transform(image)
+            image = image.unsqueeze(0).to(device)
+            img_file_s = img_file.split('_')
+            img_time = img_file_s[2]+img_file_s[3]+"__"+img_file_s[4]+'_'+img_file_s[5]
+            with torch.no_grad():
+                outputs = net(image)
+                _, predicted = torch.max(outputs.data, 1)
+                f.write(f'{img_time}, {predicted.item()}\n')
+                print(f'{img_time}, {predicted.item()}')
 def main():
     # 数据集路径
     data_dir = './data/img_dataset/'
@@ -133,4 +159,7 @@ def main():
     
 
 if __name__ == "__main__":
-    main()
+    net = SimpleCNN()
+    net.load_state_dict(torch.load('./cnn/best_model.pth'))
+    inference_test(net=net,folder_path='./data/img_dataset/inference',output_file='./cnn/result.txt')
+    # main()
