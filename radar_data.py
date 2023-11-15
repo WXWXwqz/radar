@@ -1748,7 +1748,7 @@ def update_image_within_N_optimized(image, x, y, N, value):
     # 使用掩码更新图像
     image[mask] += value
 
-def genetare_image(start_time,end_time,path,dir,label):
+def genetare_image(start_time,end_time,path,dir,label,save_dir='./data/img_dataset/'):
     start_time = datetime.datetime.strptime(start_time, "%Y%m%d_%H%M%S")
     end_time = datetime.datetime.strptime(end_time, "%Y%m%d_%H%M%S")
     radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path=path)
@@ -1801,19 +1801,26 @@ def genetare_image(start_time,end_time,path,dir,label):
         # print(f"执行时间1: {execution_time} 秒")
         normalized_image = (image - np.min(image)) / (np.max(image) - np.min(image)) * 255
         normalized_image = normalized_image.astype(np.uint8)
-        os.makedirs('./data/img_dataset/',exist_ok=True)
+        os.makedirs(save_dir,exist_ok=True)
         s_time = check_time.strftime('%Y%m%d_%H%M%S')
         e_time = check_time2_end.strftime('%Y%m%d_%H%M%S')
-        print('./data/img_dataset/'+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+'_.png')
-        plt.imsave('./data/img_dataset/'+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+'_.png', normalized_image, cmap='gray')  
+        print(save_dir+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+'_.png')
+        plt.imsave(save_dir+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+'_.png', normalized_image, cmap='gray')  
 
-
+def main_generate_image_inference_dataset():
+    start_time_list = ["20231107_150000","20231107_150000", "20231107_150000", "20231107_150000"]
+    end_time_list = ["20231107_164000", "20231107_164000","20231107_164000", "20231107_164000"]
+    dir_list = [11, 10, 51, 50]
+    is_acc_list = [2, 2, 2, 2]
+    for i in range(len(start_time_list)):
+        genetare_image(start_time_list[i], end_time_list[i],"./data/mmAcc/5008/pkl/", dir_list[i], is_acc_list[i],save_dir='./data/img_dataset/inference/')
+        
 def main_generate_image_dataset():
     start_time_list=["20231107_151000","20231107_154500","20231107_153500","20231107_150000","20231107_155500","20231107_152500","20231107_152500","20231107_161500"]
     end_time_list=  ["20231107_152500","20231107_171000","20231107_155000","20231107_152500","20231107_160500","20231107_154000","20231107_154000","20231107_163000"]
     dir_list=       [11,                11,               50,               50,               51,               51,               10,               10              ] 
     is_acc_list=    [1,                  0,               1,                0,                1,                0,                0,                 1              ]
-    for i in range(len(start_time_list)):
+    for i in range(2,len(start_time_list)):
         genetare_image(start_time_list[i], end_time_list[i],"./data/mmAcc/5008/pkl/", dir_list[i], is_acc_list[i])
 
 def creat_img(start_time,end_time,path,dir,label):
@@ -1864,7 +1871,8 @@ def creat_img(start_time,end_time,path,dir,label):
 
 if __name__ == "__main__":
 
-    main_generate_image_dataset()
+    # main_generate_image_dataset()
+    main_generate_image_inference_dataset()
     # None
     # main_get_npy_dataset()
     # main_get_inference_tst_dataset_mp()
