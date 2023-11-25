@@ -1341,7 +1341,13 @@ def read_dat_to_pkl(file_path):
             else:
                 pkl_dict[time_str_toh].append(radar_dat)
             last_date = time_str_toh
-            
+    if len(pkl_dict.keys())!=0:
+        pkl_save_path = file_path+'pkl/'
+        os.makedirs(pkl_save_path,exist_ok=True)
+        with open(pkl_save_path+last_date+'.pkl', 'wb') as file:
+            pickle.dump(pkl_dict[last_date], file)
+            print(pkl_save_path+last_date+'.pkl')
+            del pkl_dict[last_date] #删除，清理内
 
 # if __name__ == "__main__":
 
@@ -1772,20 +1778,31 @@ def genetare_image(start_time,end_time,path,dir,label,save_dir='./data/img_datas
         # y_speed = []      
         start_timet = time.time()  
         for frame in radar_feature.raw_data[index_s:index_e]:
-            obj_info = [obj for obj in frame.obj_info if (obj.radar_dir == dir//10 and obj.obj_lanenum!=255 and obj.is_in_lane==dir%10)]
-            obj_x_coords = [obj.x for obj in obj_info]
-            obj_y_coords = [obj.y for obj in obj_info]
-            obj_speed = [obj.speed for obj in obj_info]
-            # obj_x_speed = [obj.vX for obj in obj_info]
-            # obj_y_speed = [obj.vY for obj in obj_info]
-            # x_speed += obj_x_speed
-            # y_speed += obj_y_speed
-            speed+=obj_speed
-            x_label+=obj_x_coords
-            y_label+=obj_y_coords
+            # obj_info = [obj for obj in frame.obj_info if (obj.radar_dir == dir//10 and obj.obj_lanenum<=200 and obj.is_in_lane==dir%10)]
+            for obj in frame.obj_info:
+                if not (obj.obj_lanenum<200 and obj.radar_dir == dir//10 and obj.is_in_lane==dir%10):
+                    continue    
+                speed.append(obj.speed)
+                x_label.append(obj.x)
+                y_label.append(obj.y)
+
+            # obj_x_coords = [obj.x for obj in obj_info]
+            # obj_y_coords = [obj.y for obj in obj_info]
+            # obj_speed = [obj.speed for obj in obj_info]
+            # # obj_x_speed = [obj.vX for obj in obj_info]
+            # # obj_y_speed = [obj.vY for obj in obj_info]
+            # # x_speed += obj_x_speed
+            # # y_speed += obj_y_speed
+            # speed+=obj_speed
+            # x_label+=obj_x_coords
+            # y_label+=obj_y_coords
+        # print("X_SIZE:",len(x_label))
         end_timet = time.time()  
         execution_time = end_timet - start_timet          
         # print(f"执行时间: {execution_time} 秒")
+        
+        if len(x_label)==0 or len(y_label)==0:
+            continue
         
         normalized_x, normalized_y = normalize_coordinates(x_label, y_label, 360, 360)
 
@@ -1794,7 +1811,7 @@ def genetare_image(start_time,end_time,path,dir,label,save_dir='./data/img_datas
         for i in range(len(normalized_x)):
             x=int(normalized_x[i])
             y=int(normalized_y[i])
-            v = abs(speed[i]/100)
+            v = abs(speed[i]/100.0)
             update_image_within_N_optimized(image, y, x, 7,v)
         end_timet = time.time()  
         execution_time = end_timet - start_timet          
@@ -1804,26 +1821,31 @@ def genetare_image(start_time,end_time,path,dir,label,save_dir='./data/img_datas
         os.makedirs(save_dir,exist_ok=True)
         s_time = check_time.strftime('%Y%m%d_%H%M%S')
         e_time = check_time2_end.strftime('%Y%m%d_%H%M%S')
-        print(save_dir+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+'_.png')
-        plt.imsave(save_dir+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+'_.png', normalized_image, cmap='gray')  
+        print(save_dir+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+"_"+str(len(x_label))+'_.png')
+        plt.imsave(save_dir+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+"_"+str(len(x_label))+'_.png', normalized_image, cmap='gray')  
 
 def main_generate_image_inference_dataset():
-    start_time_list = ["20231107_150000","20231107_150000", "20231107_150000", "20231107_150000"]
-    end_time_list = ["20231107_164000", "20231107_164000","20231107_164000", "20231107_164000"]
-    dir_list = [11, 10, 51, 50]
-    is_acc_list = [2, 2, 2, 2]
+    # start_time_list = ["20231107_150000","20231107_150000", "20231107_150000", "20231107_150000"]
+    # end_time_list = ["20231107_164000", "20231107_164000","20231107_164000", "20231107_164000"]
+    # dir_list = [11, 10, 51, 50]
+    # is_acc_list = [2, 2, 2, 2]
 
-    processes = []    
-    for i in range(len(start_time_list)):
-        p = Process(target=genetare_image, args=(start_time_list[i], end_time_list[i],"./data/mmAcc/5008/pkl/", dir_list[i], is_acc_list[i],'./data/img_dataset/inference/'))
-        processes.append(p)
-        p.start()
+    start_time_list = ["20221118_101000","20221118_101000","20221118_101000", "20221118_101000", "20221118_101000"]
+    end_time_list = ["20221118_141000", "20221118_141000", "20221118_141000","20221118_141000", "20221118_141000"]
+    dir_list = [ 11,50, 30,70,10]
+    is_acc_list = [2,2, 2,2,2]
     
-    for p in processes:
-        p.join()
-        
+    # processes = []    
     # for i in range(len(start_time_list)):
-    #     genetare_image(start_time_list[i], end_time_list[i],"./data/mmAcc/5008/pkl/", dir_list[i], is_acc_list[i],save_dir='./data/img_dataset/inference/')
+    #     p = Process(target=genetare_image, args=(start_time_list[i], end_time_list[i],"./data/mmAcc/5008/pkl/", dir_list[i], is_acc_list[i],'./data/img_dataset/inference1/'))
+    #     processes.append(p)
+    #     p.start()
+    
+    # for p in processes:
+    #     p.join()
+        
+    for i in range(len(start_time_list)):
+        genetare_image(start_time_list[i], end_time_list[i],"./data/mmAcc/5008/pkl/", dir_list[i], is_acc_list[i],save_dir='./data/img_dataset/inference1/')
         
 def main_generate_image_dataset():
     start_time_list=["20231107_151000","20231107_154500","20231107_153500","20231107_150000","20231107_155500","20231107_152500","20231107_152500","20231107_161500"]
@@ -1882,6 +1904,7 @@ def creat_img(start_time,end_time,path,dir,label):
 if __name__ == "__main__":
 
     # main_generate_image_dataset()
+    # read_dat_to_pkl("./data/mmAcc/5008/")
     main_generate_image_inference_dataset()
     # None
     # main_get_npy_dataset()

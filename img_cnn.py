@@ -7,7 +7,7 @@ from torchvision import transforms
 from PIL import Image
 from sklearn.model_selection import train_test_split
 from torch.nn import functional as F
-
+import pandas as pd
 # 检查CUDA是否可用
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -48,11 +48,11 @@ class SimpleCNN(nn.Module):
         super(SimpleCNN, self).__init__()
         self.conv1 = nn.Conv2d(1, 3, 5)  # 输入通道1，输出通道6，卷积核大小5
         self.pool = nn.MaxPool2d(2, 2)   # 池化层
-        self.conv2 = nn.Conv2d(3, 6, 5) # 输入通道6，输出通道16，卷积核大小5
-        self.conv3 = nn.Conv2d(6, 9, 5) # 输入通道6，输出通道16，卷积核大小5
-        self.conv4 = nn.Conv2d(9, 12, 5) # 输入通道6，输出通道16，卷积核大小5
+        self.conv2 = nn.Conv2d(3, 3, 5) # 输入通道6，输出通道16，卷积核大小5
+        self.conv3 = nn.Conv2d(3, 6, 5) # 输入通道6，输出通道16，卷积核大小5
+        self.conv4 = nn.Conv2d(6, 9, 5) # 输入通道6，输出通道16，卷积核大小5
         # 减小全连接层的尺寸
-        self.fc1 = nn.Linear(12*18*18, 16)  # 第一个全连接层
+        self.fc1 = nn.Linear(9*18*18, 16)  # 第一个全连接层
         # self.fc2 = nn.Linear(64, 32)            # 第二个全连接层
         self.fc3 = nn.Linear(16, 2)             # 第三个全连接层，输出层
 
@@ -65,12 +65,14 @@ class SimpleCNN(nn.Module):
         x = F.relu(self.fc1(x))
         # x = F.relu(self.fc2(x))
         x = self.fc3(x)
+        # x = F.softmax(x, dim=1)
         return x
 
 # 训练函数
 def train_model(net, train_loader, criterion, optimizer, num_epochs,test_loader):
-    net.to(device)
+    
     for epoch in range(num_epochs):
+        net.to(device)
         net.train()
         running_loss = 0.0
         correct = 0
@@ -93,8 +95,10 @@ def train_model(net, train_loader, criterion, optimizer, num_epochs,test_loader)
         epoch_loss = running_loss / len(train_loader)
         epoch_acc = 100 * correct / total
         print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss:.4f}, Training Accuracy: {epoch_acc:.2f}%')
-        test_model(net, test_loader)
-
+        tst_acc = test_model(net, test_loader)
+        # if tst_acc>99.0:
+        #     print("stop")
+        #     break
 # 测试函数
 def test_model(net, test_loader):
     net.eval()
@@ -109,9 +113,26 @@ def test_model(net, test_loader):
             correct += (predicted == labels).sum().item()
 
     print(f'Accuracy on the test set: {100 * correct / total}%')
-    if 100 * correct / total > 99.0:
-        torch.save(net.state_dict(), './cnn/best_model.pth')
 
+    if 100 * correct / total > 99.0:
+        net.to('cpu')
+        scripted_model = torch.jit.script(net)
+
+        # 保存脚本化的模型
+        # torch.load(python_model, map_location = 'cpu')
+        scripted_model.save("./cnn/script_best_model.pth")
+        # input_shape = (1, 300,24)
+        input_shape = (1,images.shape[1],images.shape[2],images.shape[3])
+        torch.jit.trace(net,torch.rand(input_shape)).save('./cnn/jit_best_model.pth')
+        torch.save(net.state_dict(), './cnn/best_model.pth')
+    return 100 * correct / total
+def save_tensor_to_csv(tensor, filename):
+    # Ensure the tensor is on the CPU and convert to a 2D tensor
+    tensor_2d = tensor.cpu().squeeze().numpy()
+    
+    # Convert to a DataFrame and save as CSV
+    df = pd.DataFrame(tensor_2d)
+    df.to_csv(filename, index=False)
 def inference_test(net, folder_path, output_file):
     net.to(device)
     net.eval()
@@ -128,23 +149,33 @@ def inference_test(net, folder_path, output_file):
     with open(output_file, 'w') as f:
         for img_file in image_files:
             img_path = os.path.join(folder_path, img_file)
+            img_path='./data/img_dataset/inference/2_label_dir_10_20231107_151500_20231107_151700_.png'
             image = Image.open(img_path).convert('L')
             image = transform(image)
             image = image.unsqueeze(0).to(device)
             img_file_s = img_file.split('_')
             img_time = img_file_s[2]+img_file_s[3]+"__"+img_file_s[4]+'_'+img_file_s[5]
             with torch.no_grad():
+                save_tensor_to_csv(image[0], './cnn/inference.csv')
+                save_tensor_to_csv(image[0]*255, './cnn/inference1.csv')
                 outputs = net(image)
                 _, predicted = torch.max(outputs.data, 1)
-                f.write(f'{img_time}, {predicted.item()}\n')
-                print(f'{img_time}, {predicted.item()}')
+                softmax_out = torch.softmax(outputs, dim=1)
+                score = outputs[0][1]
+                if score>0.7:
+                    res =1
+                else:   
+                    res =0
+                res_str = "{},{},{:.2f}".format(img_time,res,score*100)
+                f.write(res_str+'\n')
+                print(res_str)
 def main():
     # 数据集路径
     data_dir = './data/img_dataset/'
     images, labels = get_images_and_labels(data_dir)
 
     train_images, test_images, train_labels, test_labels = train_test_split(
-        images, labels, test_size=0.2, random_state=42)
+        images, labels, test_size=0.3, random_state=42)
 
     transform = transforms.Compose([
         transforms.Resize((360, 360)),
