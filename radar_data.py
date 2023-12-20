@@ -13,6 +13,7 @@ from sklearn.metrics import mutual_info_score
 import pandas as pd
 import time
 from multiprocessing import Process
+from collections import Counter
 
 def get_npy_dataset(dateset_list):
     # dateset_list = ['acc.npy', 'normal.npy','acc1.npy','normal1.npy','normal2.npy']
@@ -1774,6 +1775,8 @@ def genetare_image(start_time,end_time,path,dir,label,save_dir='./data/img_datas
         x_label = []
         y_label = []
         speed =[]
+        lane_dict_obj_num = {}
+
         # x_speed = []
         # y_speed = []      
         start_timet = time.time()  
@@ -1785,6 +1788,13 @@ def genetare_image(start_time,end_time,path,dir,label,save_dir='./data/img_datas
                 speed.append(obj.speed)
                 x_label.append(obj.x)
                 y_label.append(obj.y)
+                if obj.obj_lanenum not in lane_dict_obj_num:
+
+                    lane_dict_obj_num[obj.obj_lanenum]=[0]*31
+                    lane_dict_obj_num[obj.obj_lanenum][(int)(obj.x/1000)]+=1
+                else:
+                    lane_dict_obj_num[obj.obj_lanenum][(int)(obj.x/1000)]+=1
+                    # lane_dict_obj_num[obj.obj_lanenum].append((int)(obj.x/1000))
 
             # obj_x_coords = [obj.x for obj in obj_info]
             # obj_y_coords = [obj.y for obj in obj_info]
@@ -1797,6 +1807,13 @@ def genetare_image(start_time,end_time,path,dir,label,save_dir='./data/img_datas
             # x_label+=obj_x_coords
             # y_label+=obj_y_coords
         # print("X_SIZE:",len(x_label))
+        for key in lane_dict_obj_num.keys():
+            print(key)
+            print(lane_dict_obj_num[key])
+            # element_count =Counter(lane_dict_obj_num[key])
+            # min_element, min_count = element_count.most_common()[-1]
+            # print(min_element,min_count)
+
         end_timet = time.time()  
         execution_time = end_timet - start_timet          
         # print(f"执行时间: {execution_time} 秒")
@@ -1818,6 +1835,7 @@ def genetare_image(start_time,end_time,path,dir,label,save_dir='./data/img_datas
         # print(f"执行时间1: {execution_time} 秒")
         normalized_image = (image - np.min(image)) / (np.max(image) - np.min(image)) * 255
         normalized_image = normalized_image.astype(np.uint8)
+        # x_label_10 = np.array(x_label[:])/1000
         os.makedirs(save_dir,exist_ok=True)
         s_time = check_time.strftime('%Y%m%d_%H%M%S')
         e_time = check_time2_end.strftime('%Y%m%d_%H%M%S')
@@ -1825,15 +1843,15 @@ def genetare_image(start_time,end_time,path,dir,label,save_dir='./data/img_datas
         plt.imsave(save_dir+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+"_"+str(len(x_label))+'_.png', normalized_image, cmap='gray')  
 
 def main_generate_image_inference_dataset():
-    # start_time_list = ["20231107_150000","20231107_150000", "20231107_150000", "20231107_150000"]
-    # end_time_list = ["20231107_164000", "20231107_164000","20231107_164000", "20231107_164000"]
-    # dir_list = [11, 10, 51, 50]
-    # is_acc_list = [2, 2, 2, 2]
+    start_time_list = ["20231107_151500","20231107_150000", "20231107_150000", "20231107_150000"]
+    end_time_list = ["20231107_164000", "20231107_164000","20231107_164000", "20231107_164000"]
+    dir_list = [11, 10, 51, 50]
+    is_acc_list = [2, 2, 2, 2]
 
-    start_time_list = ["20221118_101000","20221118_101000","20221118_101000", "20221118_101000", "20221118_101000"]
-    end_time_list = ["20221118_141000", "20221118_141000", "20221118_141000","20221118_141000", "20221118_141000"]
-    dir_list = [ 11,50, 30,70,10]
-    is_acc_list = [2,2, 2,2,2]
+    # start_time_list = ["20221118_101000","20221118_101000","20221118_101000", "20221118_101000", "20221118_101000"]
+    # end_time_list = ["20221118_141000", "20221118_141000", "20221118_141000","20221118_141000", "20221118_141000"]
+    # dir_list = [ 11,50, 30,70,10]
+    # is_acc_list = [2,2, 2,2,2]
     
     # processes = []    
     # for i in range(len(start_time_list)):
