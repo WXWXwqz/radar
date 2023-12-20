@@ -14,7 +14,7 @@ import pandas as pd
 import time
 from multiprocessing import Process
 from collections import Counter
-
+import csv
 def get_npy_dataset(dateset_list):
     # dateset_list = ['acc.npy', 'normal.npy','acc1.npy','normal1.npy','normal2.npy']
     x_data = None
@@ -1309,7 +1309,10 @@ def read_dat_file(filename):
             # value = str.from
             print(value)
 
-def read_dat_to_pkl(file_path):
+def read_dat_to_pkl(file_path,pkl_path='./data/pkl/'):
+
+    last_dir = file_path.split('/')[-1]
+
     dat_file_list = find_dat_files(file_path)
     dat_file_list = sorted(dat_file_list)
     pkl_dict={}
@@ -1329,13 +1332,12 @@ def read_dat_to_pkl(file_path):
             time_str_toh = radar_dat.time.strftime('%Y%m%d_%H')
             if time_str_toh not in  pkl_dict.keys():
                 if len(pkl_dict.keys())!=0:
-                    pkl_save_path = file_path+'pkl/'
+                    pkl_save_path = pkl_path+last_dir+'/'
                     os.makedirs(pkl_save_path,exist_ok=True)
                     with open(pkl_save_path+last_date+'.pkl', 'wb') as file:
                         pickle.dump(pkl_dict[last_date], file)
                         print(pkl_save_path+last_date+'.pkl')
                         del pkl_dict[last_date] #删除，清理内
-
 
                 pkl_dict[time_str_toh]=[]
                 pkl_dict[time_str_toh].append(radar_dat)                
@@ -1343,7 +1345,7 @@ def read_dat_to_pkl(file_path):
                 pkl_dict[time_str_toh].append(radar_dat)
             last_date = time_str_toh
     if len(pkl_dict.keys())!=0:
-        pkl_save_path = file_path+'pkl/'
+        pkl_save_path = pkl_path+last_dir+'/'
         os.makedirs(pkl_save_path,exist_ok=True)
         with open(pkl_save_path+last_date+'.pkl', 'wb') as file:
             pickle.dump(pkl_dict[last_date], file)
@@ -1755,10 +1757,35 @@ def update_image_within_N_optimized(image, x, y, N, value):
     # 使用掩码更新图像
     image[mask] += value
 
-def genetare_image(start_time,end_time,path,dir,label,save_dir='./data/img_dataset/'):
+def get_lanecode_list(raw_data,dir,length=3000,th =100):
+
+    dict_lanecode = {}
+    if length>len(raw_data):
+        length = len(raw_data)
+    for frame in raw_data[0:length]:
+        for obj in frame.obj_info:
+            if (obj.obj_lanenum<200 and obj.radar_dir == dir//10 and obj.is_in_lane==dir%10):
+                if obj.obj_lanenum <6:
+                    print("ERROR")
+                if obj.obj_lanenum not in dict_lanecode:
+                    dict_lanecode[obj.obj_lanenum]=1
+                else:
+                    dict_lanecode[obj.obj_lanenum]+=1
+    print(dict_lanecode)
+    re_list=[]
+    for key in dict_lanecode.keys():
+        if dict_lanecode[key]>th:
+            re_list.append(key)
+            # del dict_lanecode[key]
+    print(re_list)
+    return re_list
+
+def genetare_image(start_time,end_time,path,dir,label,data_ip,save_dir='./data/img_dataset/'):
     start_time = datetime.datetime.strptime(start_time, "%Y%m%d_%H%M%S")
     end_time = datetime.datetime.strptime(end_time, "%Y%m%d_%H%M%S")
     radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path=path)
+    lanecode_list = get_lanecode_list(raw_data=radar_feature.raw_data,dir=dir)
+
     check_time = start_time
     while True:
         check_time = check_time+datetime.timedelta(seconds=1)
@@ -1783,7 +1810,7 @@ def genetare_image(start_time,end_time,path,dir,label,save_dir='./data/img_datas
         for frame in radar_feature.raw_data[index_s:index_e]:
             # obj_info = [obj for obj in frame.obj_info if (obj.radar_dir == dir//10 and obj.obj_lanenum<=200 and obj.is_in_lane==dir%10)]
             for obj in frame.obj_info:
-                if not (obj.obj_lanenum<200 and obj.radar_dir == dir//10 and obj.is_in_lane==dir%10):
+                if not (obj.obj_lanenum in lanecode_list and obj.radar_dir == dir//10 and obj.is_in_lane==dir%10):
                     continue    
                 speed.append(obj.speed)
                 x_label.append(obj.x)
@@ -1807,12 +1834,12 @@ def genetare_image(start_time,end_time,path,dir,label,save_dir='./data/img_datas
             # x_label+=obj_x_coords
             # y_label+=obj_y_coords
         # print("X_SIZE:",len(x_label))
-        for key in lane_dict_obj_num.keys():
-            print(key)
-            print(lane_dict_obj_num[key])
-            # element_count =Counter(lane_dict_obj_num[key])
-            # min_element, min_count = element_count.most_common()[-1]
-            # print(min_element,min_count)
+        # for key in lane_dict_obj_num.keys():
+        #     print(key)
+        #     print(lane_dict_obj_num[key])
+        #     # element_count =Counter(lane_dict_obj_num[key])
+        #     # min_element, min_count = element_count.most_common()[-1]
+        #     # print(min_element,min_count)
 
         end_timet = time.time()  
         execution_time = end_timet - start_timet          
@@ -1839,8 +1866,8 @@ def genetare_image(start_time,end_time,path,dir,label,save_dir='./data/img_datas
         os.makedirs(save_dir,exist_ok=True)
         s_time = check_time.strftime('%Y%m%d_%H%M%S')
         e_time = check_time2_end.strftime('%Y%m%d_%H%M%S')
-        print(save_dir+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+"_"+str(len(x_label))+'_.png')
-        plt.imsave(save_dir+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+"_"+str(len(x_label))+'_.png', normalized_image, cmap='gray')  
+        print(save_dir+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+"_"+str(len(x_label))+'_'+data_ip+'_.png')
+        plt.imsave(save_dir+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+"_"+str(len(x_label))+'_'+data_ip+'_.png', normalized_image, cmap='gray')  
 
 def main_generate_image_inference_dataset():
     start_time_list = ["20231107_151500","20231107_150000", "20231107_150000", "20231107_150000"]
@@ -1919,11 +1946,82 @@ def creat_img(start_time,end_time,path,dir,label):
     # plt.colorbar()
     # plt.savefig(f"./fig/tst.png")
 
+def origin_data_deal(path):
+
+    dirs = os.listdir(path)
+    for dir in dirs:
+        dir_path = os.path.join(path,dir)
+        print(dir_path)
+        read_dat_to_pkl(dir_path)
+
+def get_image_csv_infor(image_csv_infor_path):
+
+
+    # 初始化空列表用于存储每列的数据
+    start_time_list = []
+    end_time_list = []
+    dir_list = []
+    is_acc_list = []
+    ip_list = []
+
+    # 读取 CSV 文件
+    with open(image_csv_infor_path, 'r') as file:
+        reader = csv.reader(file)
+
+        # 跳过标题行
+        next(reader)
+
+        # 读取每行数据
+        for row in reader:
+            start_time_list.append(row[0].strip())  # 去除前后空格
+            end_time_list.append(row[1].strip())    # 去除前后空格
+            dir_list.append(int(row[2].strip()))    # 去除空格并转换为整数
+            is_acc_list.append(int(row[3].strip())) # 去除空格并转换为整数
+            ip_list.append(row[4].strip())          # 去除前后空格
+
+
+    # 打印结果以验证
+    print("Start Times:", start_time_list)
+    print("End Times:", end_time_list)
+    print("Dirs:", dir_list)
+    print("Is Acc:", is_acc_list)
+    print("IPs:", ip_list)   
+    return start_time_list,end_time_list,dir_list,is_acc_list,ip_list
+
+def creat_image_dataset(save_path,image_csv_infor_path):
+
+    # start_time_list=["20231107_151300","20231107_154500","20231107_153500","20231107_150000","20231107_155500","20231107_152500","20231107_152500","20231107_161500","20231107_160000","20231107_160000","20231107_160000","20231107_160000"]
+    # end_time_list=  ["20231107_153000","20231107_171000","20231107_155000","20231107_152500","20231107_160500","20231107_154000","20231107_154000","20231107_163000","20231107_163000","20231107_163000","20231107_163000","20231107_163000"]
+    # dir_list=       [11,                11,               50,               50,               51,               51,               10,               10              , 30              , 31              , 70              , 71              ] 
+    # is_acc_list=    [1,                  0,               1,                0,                1,                0,                0,                 1              , 0               ,  0              ,  0              ,  0              ]
+    # ip_list =       ["37.31.205.161"  , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" ]
+    
+    start_time_list,end_time_list,dir_list,is_acc_list,ip_list = get_image_csv_infor(image_csv_infor_path)
+    for i in range(len(start_time_list)):
+        genetare_image(start_time_list[i], end_time_list[i],"./data/pkl/"+ip_list[i]+"/", dir_list[i], is_acc_list[i],data_ip=ip_list[i],save_dir=save_path)
+
+    # for i in range(2,len(start_time_list)):
+    #     genetare_image(start_time_list[i], end_time_list[i],"./data/mmAcc/5008/pkl/", dir_list[i], is_acc_list[i])
+
+
+
+
+
 if __name__ == "__main__":
 
+    # origin_data_deal('./data/origin_radar/')
+    # creat_image_dataset("./data/img_dataset/train1/","./data/img_dataset/train2.csv")
+    creat_image_dataset("./data/img_dataset/test1/","./data/img_dataset/test1.csv")
+
+
+
+
+
+
+
     # main_generate_image_dataset()
-    # read_dat_to_pkl("./data/mmAcc/5008/")
-    main_generate_image_inference_dataset()
+    # # read_dat_to_pkl("./data/mmAcc/5008/")
+    # main_generate_image_inference_dataset()
     # None
     # main_get_npy_dataset()
     # main_get_inference_tst_dataset_mp()

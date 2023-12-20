@@ -8,6 +8,7 @@ from PIL import Image
 from sklearn.model_selection import train_test_split
 from torch.nn import functional as F
 import pandas as pd
+from collections import Counter
 # 检查CUDA是否可用
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -69,7 +70,7 @@ class SimpleCNN(nn.Module):
         return x
 
 # 训练函数
-def train_model(net, train_loader, criterion, optimizer, num_epochs,test_loader):
+def train_model(net, train_loader, criterion, optimizer, num_epochs,test_loader,exp_name):
     
     for epoch in range(num_epochs):
         net.to(device)
@@ -95,12 +96,12 @@ def train_model(net, train_loader, criterion, optimizer, num_epochs,test_loader)
         epoch_loss = running_loss / len(train_loader)
         epoch_acc = 100 * correct / total
         print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss:.4f}, Training Accuracy: {epoch_acc:.2f}%')
-        tst_acc = test_model(net, test_loader)
+        tst_acc = test_model(net, test_loader,exp_name)
         # if tst_acc>99.0:
         #     print("stop")
         #     break
 # 测试函数
-def test_model(net, test_loader):
+def test_model(net, test_loader,exp_name):
     net.eval()
     correct = 0
     total = 0
@@ -113,18 +114,19 @@ def test_model(net, test_loader):
             correct += (predicted == labels).sum().item()
 
     print(f'Accuracy on the test set: {100 * correct / total}%')
-
+    save_dir = "./cnn/"+exp_name+"/"
+    os.makedirs(save_dir,exist_ok=True)
     if 100 * correct / total > 99.0:
         net.to('cpu')
         scripted_model = torch.jit.script(net)
 
         # 保存脚本化的模型
         # torch.load(python_model, map_location = 'cpu')
-        scripted_model.save("./cnn/script_best_model.pth")
+        scripted_model.save(save_dir+"script_best_model.pth")
         # input_shape = (1, 300,24)
         input_shape = (1,images.shape[1],images.shape[2],images.shape[3])
-        torch.jit.trace(net,torch.rand(input_shape)).save('./cnn/jit_best_model.pth')
-        torch.save(net.state_dict(), './cnn/best_model.pth')
+        torch.jit.trace(net,torch.rand(input_shape)).save(save_dir+'jit_best_model.pth')
+        torch.save(net.state_dict(), save_dir+'best_model.pth')
     return 100 * correct / total
 def save_tensor_to_csv(tensor, filename):
     # Ensure the tensor is on the CPU and convert to a 2D tensor
@@ -169,6 +171,31 @@ def inference_test(net, folder_path, output_file):
                 res_str = "{},{},{:.2f}".format(img_time,res,score*100)
                 f.write(res_str+'\n')
                 print(res_str)
+def train(data_dir,exp_name):
+    # 数据集路径
+    # data_dir = './data/img_dataset/'
+    images, labels = get_images_and_labels(data_dir)
+    print(Counter(labels))
+    train_images, test_images, train_labels, test_labels = train_test_split(
+        images, labels, test_size=0.3, random_state=42)
+
+    transform = transforms.Compose([
+        transforms.Resize((360, 360)),
+        transforms.ToTensor()
+    ])
+
+    train_dataset = ImageDataset(train_images, train_labels, transform=transform)
+    test_dataset = ImageDataset(test_images, test_labels, transform=transform)
+
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+    net = SimpleCNN()
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(net.parameters(), lr=0.001)
+
+    train_model(net, train_loader, criterion, optimizer,20,test_loader,exp_name)  
 def main():
     # 数据集路径
     data_dir = './data/img_dataset/'
@@ -198,6 +225,7 @@ def main():
 
 if __name__ == "__main__":
     net = SimpleCNN()
-    net.load_state_dict(torch.load('./cnn/best_model.pth'))
-    inference_test(net=net,folder_path='./data/img_dataset/inference',output_file='./cnn/result.txt')
+    # net.load_state_dict(torch.load('./cnn/best_model.pth'))
+    # inference_test(net=net,folder_path='./data/img_dataset/inference',output_file='./cnn/result.txt')
     # main()
+    train(data_dir='./data/img_dataset/train1/',exp_name='exp1')
