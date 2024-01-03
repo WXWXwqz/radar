@@ -151,30 +151,38 @@ def inference_test(net, folder_path, output_file):
     with open(output_file, 'w') as f:
         for img_file in image_files:
             img_path = os.path.join(folder_path, img_file)
-            img_path='./data/img_dataset/inference/2_label_dir_10_20231107_151500_20231107_151700_.png'
+            save_name = img_file.split('/')[-1]
+            save_name =save_name.replace('.png','')
             image = Image.open(img_path).convert('L')
             image = transform(image)
             image = image.unsqueeze(0).to(device)
             img_file_s = img_file.split('_')
             img_time = img_file_s[2]+img_file_s[3]+"__"+img_file_s[4]+'_'+img_file_s[5]
             with torch.no_grad():
-                save_tensor_to_csv(image[0], './cnn/inference.csv')
-                save_tensor_to_csv(image[0]*255, './cnn/inference1.csv')
+                # save_tensor_to_csv(image[0], './cnn/inference.csv')
+                # save_tensor_to_csv(image[0]*255, './cnn/inference1.csv')
                 outputs = net(image)
                 _, predicted = torch.max(outputs.data, 1)
                 softmax_out = torch.softmax(outputs, dim=1)
-                score = outputs[0][1]
+                score = softmax_out[0][1].item()
                 if score>0.7:
                     res =1
                 else:   
                     res =0
-                res_str = "{},{},{:.2f}".format(img_time,res,score*100)
+                res_str = "{},{:.2f}".format(res,score*100)
+                res_str=save_name+res_str
                 f.write(res_str+'\n')
                 print(res_str)
-def train(data_dir,exp_name):
+def train(data_dir_list,exp_name):
     # 数据集路径
     # data_dir = './data/img_dataset/'
-    images, labels = get_images_and_labels(data_dir)
+    images =[]
+    labels = []
+    for data_dir in data_dir_list:
+        images_, labels_ = get_images_and_labels(data_dir)
+        images.extend(images_)
+        labels.extend(labels_)
+    # images, labels = get_images_and_labels(data_dir)
     print(Counter(labels))
     train_images, test_images, train_labels, test_labels = train_test_split(
         images, labels, test_size=0.3, random_state=42)
@@ -225,7 +233,8 @@ def main():
 
 if __name__ == "__main__":
     net = SimpleCNN()
-    # net.load_state_dict(torch.load('./cnn/best_model.pth'))
-    # inference_test(net=net,folder_path='./data/img_dataset/inference',output_file='./cnn/result.txt')
-    # main()
-    train(data_dir='./data/img_dataset/train1/',exp_name='exp1')
+    net.load_state_dict(torch.load('./cnn/exp4/best_model.pth'))
+    inference_test(net=net,folder_path='./data/img_dataset/train1',output_file='./data/img_dataset/train1/exp4_result.txt')
+    # # main()
+    # train(data_dir_list=['./data/img_dataset/train1/','./data/img_dataset/test2/','./data/img_dataset/test1/'],exp_name='exp2')
+    # train(data_dir_list=['./data/img_dataset/train4/'],exp_name='exp4')

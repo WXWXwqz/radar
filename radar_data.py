@@ -1229,10 +1229,12 @@ class Radar_Dat:
         # 清除子图
         if is_clear==1:
             ax.clear()
-        ax.set_xlim([0, 30000])
-        ax.set_ylim([-3000, 3000])
+        # ax.set_xlim([0, 30000])
+        # ax.set_ylim([-3000, 3000])
         for dir in dir_list:
-            obj_info = [obj for obj in self.obj_info if (obj.radar_dir == dir and obj.obj_lanenum!=255)]
+            obj_info = [obj for obj in self.obj_info if ( obj.radar_dir == dir//10 and obj.is_in_lane==dir%10 and obj.obj_lanenum!=255)]
+            
+            # obj_info = [obj for obj in self.obj_info if (obj.radar_dir == dir)]
             obj_x_coords = [obj.x for obj in obj_info]
             obj_y_coords = [obj.y for obj in obj_info]
             ax.scatter(obj_x_coords, obj_y_coords)
@@ -1266,6 +1268,17 @@ def find_dat_files(directory):
     for root, dirs, files in os.walk(directory):
         for file in files:
             if file.endswith('.dat'):
+                dat_files.append(os.path.join(root, file))
+
+    return dat_files
+def find_radar_data_files(directory):
+    dat_files = []
+
+    # 遍历目录
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            # if file.endswith('.dat'):
+            if file.startswith('radar_data'):
                 dat_files.append(os.path.join(root, file))
 
     return dat_files
@@ -1313,7 +1326,7 @@ def read_dat_to_pkl(file_path,pkl_path='./data/pkl/'):
 
     last_dir = file_path.split('/')[-1]
 
-    dat_file_list = find_dat_files(file_path)
+    dat_file_list = find_radar_data_files(file_path)
     dat_file_list = sorted(dat_file_list)
     pkl_dict={}
     last_date=None
@@ -1551,7 +1564,7 @@ def display_the_origin_radar_data(start_time,end_time,path):
     #     loaded_data = pickle.load(file)
     # None
 
-def display_the_origin_radar_data1(start_time,end_time,path):
+def display_the_origin_radar_data1(start_time,end_time,path,dir):
 
 
     radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path=path)
@@ -1561,9 +1574,32 @@ def display_the_origin_radar_data1(start_time,end_time,path):
     plt.grid(True)
     plt.show(block=False)
     for frame in radar_feature.raw_data[radar_feature.index:radar_feature.indexend]:
-        frame.plot_obj_d([1],fig, ax,is_clear=0)
+        frame.plot_obj_d([dir],fig, ax,is_clear=0)
         None
+def display_the_origin_radar_data_once(start_time,end_time,path,dir):
 
+
+    radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path=path)
+    fig, ax = plt.subplots()
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.grid(True)
+    plt.show(block=False)
+    obj_x=[]
+    obj_y=[]
+    for frame in radar_feature.raw_data[radar_feature.index:radar_feature.indexend]:
+
+        obj_info = [obj for obj in frame.obj_info if ( obj.radar_dir == dir//10 and obj.is_in_lane==dir%10 and obj.obj_lanenum!=255)]
+        
+        # obj_info = [obj for obj in self.obj_info if (obj.radar_dir == dir)]
+        obj_x_coords = [obj.x for obj in obj_info]
+        obj_y_coords = [obj.y for obj in obj_info]
+        obj_x+=obj_x_coords
+        obj_y+=obj_y_coords
+        
+    ax.scatter(obj_x, obj_y,s=1)
+    plt.draw()
+    plt.pause(500)
 def display_the_history_trace(start_time,end_time,path,dir,label):
     radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path=path)
     fig, ax = plt.subplots()
@@ -1573,8 +1609,8 @@ def display_the_history_trace(start_time,end_time,path,dir,label):
     
 
     ax.clear()
-    ax.set_xlim([5000, 30000])
-    ax.set_ylim([-3000, 1000])
+    ax.set_xlim([-5000, 50000])
+    ax.set_ylim([-5000, 5000])
 
     # dir=
     for frame in radar_feature.raw_data[radar_feature.index:radar_feature.indexend]:
@@ -1780,7 +1816,7 @@ def get_lanecode_list(raw_data,dir,length=3000,th =100):
     print(re_list)
     return re_list
 
-def genetare_image(start_time,end_time,path,dir,label,data_ip,save_dir='./data/img_dataset/'):
+def genetare_image(start_time,end_time,path,dir,label,data_ip,save_dir='./data/img_dataset/',frame_len_min=2,frame_diff_msec=1000):
     start_time = datetime.datetime.strptime(start_time, "%Y%m%d_%H%M%S")
     end_time = datetime.datetime.strptime(end_time, "%Y%m%d_%H%M%S")
     radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path=path)
@@ -1788,17 +1824,16 @@ def genetare_image(start_time,end_time,path,dir,label,data_ip,save_dir='./data/i
 
     check_time = start_time
     while True:
-        check_time = check_time+datetime.timedelta(seconds=1)
-        check_time2_end = check_time+datetime.timedelta(minutes=2)
+        check_time = check_time+datetime.timedelta(milliseconds=frame_diff_msec)
+        if frame_len_min<100:
+            check_time2_end = check_time+datetime.timedelta(minutes=frame_len_min)
         if check_time>end_time:
             break
-        start_timet = time.time()  
         # radar_feature = Radar_Feature(start_time=start_time,end_time=check_time2_end,path=path)
         index_s = bisect.bisect(radar_feature.raw_data_time,check_time)
-        index_e = bisect.bisect(radar_feature.raw_data_time,check_time2_end)
-        end_timet = time.time()  
-        execution_time = end_timet - start_timet          
-        # print(f"执行时间0: {execution_time} 秒")
+        if frame_len_min<100:
+            index_e = bisect.bisect(radar_feature.raw_data_time,check_time2_end)    
+
         x_label = []
         y_label = []
         speed =[]
@@ -1807,7 +1842,11 @@ def genetare_image(start_time,end_time,path,dir,label,data_ip,save_dir='./data/i
         # x_speed = []
         # y_speed = []      
         start_timet = time.time()  
-        for frame in radar_feature.raw_data[index_s:index_e]:
+        frame_cnt =0
+        while True:
+            frame  = radar_feature.raw_data[index_s+frame_cnt]
+            frame_cnt +=1
+        # for frame in radar_feature.raw_data[index_s:index_e]:
             # obj_info = [obj for obj in frame.obj_info if (obj.radar_dir == dir//10 and obj.obj_lanenum<=200 and obj.is_in_lane==dir%10)]
             for obj in frame.obj_info:
                 if not (obj.obj_lanenum in lanecode_list and obj.radar_dir == dir//10 and obj.is_in_lane==dir%10):
@@ -1822,6 +1861,12 @@ def genetare_image(start_time,end_time,path,dir,label,data_ip,save_dir='./data/i
                 else:
                     lane_dict_obj_num[obj.obj_lanenum][(int)(obj.x/1000)]+=1
                     # lane_dict_obj_num[obj.obj_lanenum].append((int)(obj.x/1000))
+            if frame_len_min<100:
+                if index_e<=index_s+frame_cnt:
+                    break
+            elif frame_len_min>100:
+                if len(x_label)>frame_len_min or len(y_label)>frame_len_min:
+                    break
 
             # obj_x_coords = [obj.x for obj in obj_info]
             # obj_y_coords = [obj.y for obj in obj_info]
@@ -1840,32 +1885,27 @@ def genetare_image(start_time,end_time,path,dir,label,data_ip,save_dir='./data/i
         #     # element_count =Counter(lane_dict_obj_num[key])
         #     # min_element, min_count = element_count.most_common()[-1]
         #     # print(min_element,min_count)
-
-        end_timet = time.time()  
-        execution_time = end_timet - start_timet          
-        # print(f"执行时间: {execution_time} 秒")
         
-        if len(x_label)==0 or len(y_label)==0:
+        if len(x_label)<=1000 or len(y_label)<=1000:
             continue
         
+
         normalized_x, normalized_y = normalize_coordinates(x_label, y_label, 360, 360)
 
         image = np.zeros((360, 360), dtype=np.float16)  
-        start_timet = time.time() 
         for i in range(len(normalized_x)):
             x=int(normalized_x[i])
             y=int(normalized_y[i])
             v = abs(speed[i]/100.0)
-            update_image_within_N_optimized(image, y, x, 7,v)
-        end_timet = time.time()  
-        execution_time = end_timet - start_timet          
-        # print(f"执行时间1: {execution_time} 秒")
+            update_image_within_N_optimized(image, y, x, 7,v)        
+
         normalized_image = (image - np.min(image)) / (np.max(image) - np.min(image)) * 255
         normalized_image = normalized_image.astype(np.uint8)
         # x_label_10 = np.array(x_label[:])/1000
         os.makedirs(save_dir,exist_ok=True)
-        s_time = check_time.strftime('%Y%m%d_%H%M%S')
-        e_time = check_time2_end.strftime('%Y%m%d_%H%M%S')
+        s_time = check_time.strftime('%Y%m%d_%H%M%S')+ '_' + check_time.strftime('%f')[:3]
+        e_time = frame.time.strftime('%Y%m%d_%H%M%S') + '_' + frame.time.strftime('%f')[:3]
+        # e_time = check_time2_end.strftime('%Y%m%d_%H%M%S') + '_' + check_time2_end.strftime('%f')[:3]
         print(save_dir+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+"_"+str(len(x_label))+'_'+data_ip+'_.png')
         plt.imsave(save_dir+str(label)+'_label_'+'dir_'+str(dir) +'_'+s_time+"_"+e_time+"_"+str(len(x_label))+'_'+data_ip+'_.png', normalized_image, cmap='gray')  
 
@@ -1963,6 +2003,8 @@ def get_image_csv_infor(image_csv_infor_path):
     dir_list = []
     is_acc_list = []
     ip_list = []
+    frame_len_min_list = []
+    frame_diff_msec_list = []
 
     # 读取 CSV 文件
     with open(image_csv_infor_path, 'r') as file:
@@ -1978,15 +2020,19 @@ def get_image_csv_infor(image_csv_infor_path):
             dir_list.append(int(row[2].strip()))    # 去除空格并转换为整数
             is_acc_list.append(int(row[3].strip())) # 去除空格并转换为整数
             ip_list.append(row[4].strip())          # 去除前后空格
+            frame_len_min_list.append(int(row[5].strip())) # 去除空格并转换为整数
+            frame_diff_msec_list.append(int(row[6].strip())) # 去除空格并转换为整数
+            
 
 
-    # 打印结果以验证
     print("Start Times:", start_time_list)
     print("End Times:", end_time_list)
     print("Dirs:", dir_list)
     print("Is Acc:", is_acc_list)
     print("IPs:", ip_list)   
-    return start_time_list,end_time_list,dir_list,is_acc_list,ip_list
+    print("Frame Len Min:", frame_len_min_list)
+    print("Frame Diff mSec:", frame_diff_msec_list)
+    return start_time_list,end_time_list,dir_list,is_acc_list,ip_list,frame_len_min_list,frame_diff_msec_list
 
 def creat_image_dataset(save_path,image_csv_infor_path):
 
@@ -1996,9 +2042,9 @@ def creat_image_dataset(save_path,image_csv_infor_path):
     # is_acc_list=    [1,                  0,               1,                0,                1,                0,                0,                 1              , 0               ,  0              ,  0              ,  0              ]
     # ip_list =       ["37.31.205.161"  , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" , "37.31.205.161" ]
     
-    start_time_list,end_time_list,dir_list,is_acc_list,ip_list = get_image_csv_infor(image_csv_infor_path)
+    start_time_list,end_time_list,dir_list,is_acc_list,ip_list,frame_len,fram_diff = get_image_csv_infor(image_csv_infor_path)
     for i in range(len(start_time_list)):
-        genetare_image(start_time_list[i], end_time_list[i],"./data/pkl/"+ip_list[i]+"/", dir_list[i], is_acc_list[i],data_ip=ip_list[i],save_dir=save_path)
+        genetare_image(start_time_list[i], end_time_list[i],"./data/pkl/"+ip_list[i]+"/", dir_list[i], is_acc_list[i],data_ip=ip_list[i],save_dir=save_path,frame_len_min=frame_len[i],frame_diff_msec=fram_diff[i])
 
     # for i in range(2,len(start_time_list)):
     #     genetare_image(start_time_list[i], end_time_list[i],"./data/mmAcc/5008/pkl/", dir_list[i], is_acc_list[i])
@@ -2009,11 +2055,15 @@ def creat_image_dataset(save_path,image_csv_infor_path):
 
 if __name__ == "__main__":
 
+    # read_dat_to_pkl("./data/tst/")   
+    # read_dat_to_pkl("./data/origin_radar/37.31.190.252")
+    # read_dat_to_pkl("./data/origin_radar/172.23.204.91")
     # origin_data_deal('./data/origin_radar/')
-    # creat_image_dataset("./data/img_dataset/train1/","./data/img_dataset/train2.csv")
-    creat_image_dataset("./data/img_dataset/test1/","./data/img_dataset/test1.csv")
-
-
+    # creat_image_dataset("./data/img_dataset/ningcheng/","./data/img_dataset/ningcheng.csv")
+    # creat_image_dataset("./data/img_dataset/train5/","./data/img_dataset/train5.csv")
+    start_time = datetime.datetime.strptime("20240102_151312", "%Y%m%d_%H%M%S")
+    end_time = datetime.datetime.strptime("20240102_152057", "%Y%m%d_%H%M%S")
+    display_the_origin_radar_data_once(start_time=start_time,end_time=end_time,path="./data/pkl/172.23.204.91/",dir=30)
 
 
 
