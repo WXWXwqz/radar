@@ -1844,6 +1844,8 @@ def genetare_image(start_time,end_time,path,dir,label,data_ip,save_dir='./data/i
         start_timet = time.time()  
         frame_cnt =0
         while True:
+            if (index_s+frame_cnt) > len(radar_feature.raw_data)-1:
+                break
             frame  = radar_feature.raw_data[index_s+frame_cnt]
             frame_cnt +=1
         # for frame in radar_feature.raw_data[index_s:index_e]:
@@ -2056,14 +2058,17 @@ def creat_image_dataset(save_path,image_csv_infor_path):
 if __name__ == "__main__":
 
     # read_dat_to_pkl("./data/tst/")   
-    # read_dat_to_pkl("./data/origin_radar/37.31.190.252")
-    # read_dat_to_pkl("./data/origin_radar/172.23.204.91")
+    read_dat_to_pkl("./data/origin_radar/37.31.190.252")
+    # read_dat_to_pkl("./data/origin_radar/37.31.205.161")
+    read_dat_to_pkl("./data/origin_radar/172.23.204.91")
+    read_dat_to_pkl("./data/origin_radar/172.23.204.95")
+
     # origin_data_deal('./data/origin_radar/')
-    # creat_image_dataset("./data/img_dataset/ningcheng/","./data/img_dataset/ningcheng.csv")
+    # creat_image_dataset("./data/img_dataset/train_4_all_time/","./data/img_dataset/train_4_all_time.csv")
     # creat_image_dataset("./data/img_dataset/train5/","./data/img_dataset/train5.csv")
-    start_time = datetime.datetime.strptime("20240102_151312", "%Y%m%d_%H%M%S")
-    end_time = datetime.datetime.strptime("20240102_152057", "%Y%m%d_%H%M%S")
-    display_the_origin_radar_data_once(start_time=start_time,end_time=end_time,path="./data/pkl/172.23.204.91/",dir=30)
+    # start_time = datetime.datetime.strptime("20240102_151312", "%Y%m%d_%H%M%S")
+    # end_time = datetime.datetime.strptime("20240102_152057", "%Y%m%d_%H%M%S")
+    # display_the_origin_radar_data_once(start_time=start_time,end_time=end_time,path="./data/pkl/172.23.204.91/",dir=30)
 
 
 

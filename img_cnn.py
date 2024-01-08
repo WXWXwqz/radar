@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 from torch.nn import functional as F
 import pandas as pd
 from collections import Counter
+import numpy as np
 # 检查CUDA是否可用
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -96,23 +97,49 @@ def train_model(net, train_loader, criterion, optimizer, num_epochs,test_loader,
         epoch_loss = running_loss / len(train_loader)
         epoch_acc = 100 * correct / total
         print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss:.4f}, Training Accuracy: {epoch_acc:.2f}%')
-        tst_acc = test_model(net, test_loader,exp_name)
+        
+    tst_acc = test_model(net, test_loader,exp_name)
         # if tst_acc>99.0:
         #     print("stop")
         #     break
-# 测试函数
+
+
 def test_model(net, test_loader,exp_name):
     net.eval()
     correct = 0
     total = 0
+    confusion_matrix = np.zeros((2, 2))
+
     with torch.no_grad():
         for images, labels in test_loader:
             images, labels = images.to(device), labels.to(device)
             outputs = net(images)
             _, predicted = torch.max(outputs.data, 1)
+            for label, prediction in zip(labels, predicted):
+                confusion_matrix[label.item(), prediction.item()] += 1
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+    # 计算每个类别的指标
+    TP = confusion_matrix[1, 1]
+    FP = confusion_matrix[0, 1]
+    TN = confusion_matrix[0, 0]
+    FN = confusion_matrix[1, 0]
 
+    accuracy = (TP + TN) / (TP + FP + TN + FN)
+    accuracy*=100
+    accuracy = round(accuracy,3)
+    recall = TP / (TP + FN) if TP + FN != 0 else 0
+    recall*=100
+    recall = round(recall,3)
+
+
+    false_positive_rate = FP / (FP + TP) if FP + TP != 0 else 0
+    false_positive_rate*=100
+    false_positive_rate = round(false_positive_rate,3)
+
+    print(f"准确率: {accuracy}")
+    print(f"召回率: {recall}")
+    print(f"误检率: {false_positive_rate},{FP}/{(FP + TP)}")
     print(f'Accuracy on the test set: {100 * correct / total}%')
     save_dir = "./cnn/"+exp_name+"/"
     os.makedirs(save_dir,exist_ok=True)
@@ -195,15 +222,46 @@ def train(data_dir_list,exp_name):
     train_dataset = ImageDataset(train_images, train_labels, transform=transform)
     test_dataset = ImageDataset(test_images, test_labels, transform=transform)
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
 
     net = SimpleCNN()
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(net.parameters(), lr=0.001)
+    num_epochs = 100
+    print("start train")
+    for epoch in range(num_epochs):
+        net.to(device)
+        net.train()
+        running_loss = 0.0
+        correct = 0
+        total = 0
+        step=0
+        for images, labels in train_loader:
+            step +=1
+            images, labels = images.to(device), labels.to(device)
 
-    train_model(net, train_loader, criterion, optimizer,20,test_loader,exp_name)  
+            optimizer.zero_grad()
+            outputs = net(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item()
+
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            step_correct = (predicted == labels).sum().item()
+            correct += step_correct
+            if step % 100 == 0:
+                print(f'step {step}/{len(train_loader)}, step loss: {loss.item():.4f}, step acc: {100*step_correct / len(labels):.2f}%')
+
+        epoch_loss = running_loss / len(train_loader)
+        epoch_acc = 100 * correct / total
+        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss:.4f}, Training Accuracy: {epoch_acc:.2f}%')        
+        test_model(net, test_loader,exp_name)
+    # train_model(net, train_loader, criterion, optimizer,20,test_loader,exp_name)  
 def main():
     # 数据集路径
     data_dir = './data/img_dataset/'
@@ -220,8 +278,8 @@ def main():
     train_dataset = ImageDataset(train_images, train_labels, transform=transform)
     test_dataset = ImageDataset(test_images, test_labels, transform=transform)
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
 
     net = SimpleCNN()
 
@@ -233,8 +291,8 @@ def main():
 
 if __name__ == "__main__":
     net = SimpleCNN()
-    net.load_state_dict(torch.load('./cnn/exp4/best_model.pth'))
-    inference_test(net=net,folder_path='./data/img_dataset/train1',output_file='./data/img_dataset/train1/exp4_result.txt')
+    # net.load_state_dict(torch.load('./cnn/exp4/best_model.pth'))
+    # inference_test(net=net,folder_path='./data/img_dataset/train_4_',output_file='./data/img_dataset/train1/exp4_result.txt')
     # # main()
     # train(data_dir_list=['./data/img_dataset/train1/','./data/img_dataset/test2/','./data/img_dataset/test1/'],exp_name='exp2')
-    # train(data_dir_list=['./data/img_dataset/train4/'],exp_name='exp4')
+    train(data_dir_list=['./data/img_dataset/train_4_all_time/'],exp_name='exp5')
