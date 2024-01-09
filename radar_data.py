@@ -1152,6 +1152,37 @@ class Radar_Feature_CNN:
                 raw_data = raw_data+loaded_data    
         return raw_data    
 
+class RadarFeatureReduction:
+    def __init__(self,start_time:datetime.datetime,end_time:datetime.datetime,path) -> None:
+        self.start_time=start_time
+        self.end_time = end_time   
+        self.raw_data_file_name=[]     
+        self.raw_data:List[Radar_Dat] = self.get_raw_data(path)
+        self.raw_data_time = [item.time for item in self.raw_data]
+        self.index = bisect.bisect(self.raw_data_time, self.start_time)
+        self.indexend = bisect.bisect(self.raw_data_time, self.end_time)
+        
+        None   
+    def get_raw_data(self,path):
+        pre_time = self.start_time - datetime.timedelta(hours=1)        
+        current_time = pre_time
+        raw_data=[]
+        while current_time <= self.end_time:
+            # print(current_time)
+            pkl_file = path+current_time.strftime('%Y%m%d_%H')+'.pkl'
+            self.raw_data_file_name.append(pkl_file)            
+            current_time += datetime.timedelta(hours=1)
+        pkl_file = path+self.end_time.strftime('%Y%m%d_%H')+'.pkl'
+        if pkl_file not in self.raw_data_file_name:
+            self.raw_data_file_name.append(pkl_file)        
+        for pkl_file in self.raw_data_file_name:
+            if not os.path.exists(pkl_file):
+                continue
+            with open(pkl_file, 'rb') as file:                
+                loaded_data = pickle.load(file)
+                raw_data = raw_data+loaded_data   
+                print(pkl_file) 
+        return raw_data    
 
 
 
@@ -1793,16 +1824,19 @@ def update_image_within_N_optimized(image, x, y, N, value):
     # 使用掩码更新图像
     image[mask] += value
 
-def get_lanecode_list(raw_data,dir,length=3000,th =100):
+def get_lanecode_list(raw_data,dir,length=10000,th =30):
 
     dict_lanecode = {}
     if length>len(raw_data):
         length = len(raw_data)
+        print("ERROR")
+        print("Len of raw_data is "+str(len(raw_data))+" but length is "+str(length))
+
     for frame in raw_data[0:length]:
         for obj in frame.obj_info:
             if (obj.obj_lanenum<200 and obj.radar_dir == dir//10 and obj.is_in_lane==dir%10):
-                if obj.obj_lanenum <6:
-                    print("ERROR")
+                # if obj.obj_lanenum <6:
+                #     print("ERROR")
                 if obj.obj_lanenum not in dict_lanecode:
                     dict_lanecode[obj.obj_lanenum]=1
                 else:
@@ -1869,24 +1903,9 @@ def genetare_image(start_time,end_time,path,dir,label,data_ip,save_dir='./data/i
             elif frame_len_min>100:
                 if len(x_label)>frame_len_min or len(y_label)>frame_len_min:
                     break
-
-            # obj_x_coords = [obj.x for obj in obj_info]
-            # obj_y_coords = [obj.y for obj in obj_info]
-            # obj_speed = [obj.speed for obj in obj_info]
-            # # obj_x_speed = [obj.vX for obj in obj_info]
-            # # obj_y_speed = [obj.vY for obj in obj_info]
-            # # x_speed += obj_x_speed
-            # # y_speed += obj_y_speed
-            # speed+=obj_speed
-            # x_label+=obj_x_coords
-            # y_label+=obj_y_coords
-        # print("X_SIZE:",len(x_label))
-        # for key in lane_dict_obj_num.keys():
-        #     print(key)
-        #     print(lane_dict_obj_num[key])
-        #     # element_count =Counter(lane_dict_obj_num[key])
-        #     # min_element, min_count = element_count.most_common()[-1]
-        #     # print(min_element,min_count)
+        frame_end_time = frame.time
+        if frame_end_time>end_time:
+            break
         
         if len(x_label)<=1000 or len(y_label)<=1000:
             continue
@@ -2058,16 +2077,17 @@ def creat_image_dataset(save_path,image_csv_infor_path):
 if __name__ == "__main__":
 
     # read_dat_to_pkl("./data/tst/")   
-    read_dat_to_pkl("./data/origin_radar/37.31.190.252")
+    # read_dat_to_pkl("./data/origin_radar/37.31.190.252")
     # read_dat_to_pkl("./data/origin_radar/37.31.205.161")
-    read_dat_to_pkl("./data/origin_radar/172.23.204.91")
-    read_dat_to_pkl("./data/origin_radar/172.23.204.95")
+    # read_dat_to_pkl("./data/origin_radar/172.23.204.91")
+    # read_dat_to_pkl("./data/origin_radar/172.23.204.95")
 
     # origin_data_deal('./data/origin_radar/')
-    # creat_image_dataset("./data/img_dataset/train_4_all_time/","./data/img_dataset/train_4_all_time.csv")
+    creat_image_dataset("./data/img_dataset/test_4_0105_1/","./data/img_dataset/test_4_0105.csv")
+    # creat_image_dataset("./data/img_dataset/tst/","./data/img_dataset/tst.csv")
     # creat_image_dataset("./data/img_dataset/train5/","./data/img_dataset/train5.csv")
-    # start_time = datetime.datetime.strptime("20240102_151312", "%Y%m%d_%H%M%S")
-    # end_time = datetime.datetime.strptime("20240102_152057", "%Y%m%d_%H%M%S")
+    # start_time = datetime.datetime.strptime("20240105_155000", "%Y%m%d_%H%M%S")
+    # end_time = datetime.datetime.strptime("20240105_155300", "%Y%m%d_%H%M%S")
     # display_the_origin_radar_data_once(start_time=start_time,end_time=end_time,path="./data/pkl/172.23.204.91/",dir=30)
 
 

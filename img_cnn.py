@@ -10,6 +10,7 @@ from torch.nn import functional as F
 import pandas as pd
 from collections import Counter
 import numpy as np
+import time
 # 检查CUDA是否可用
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -133,16 +134,22 @@ def test_model(net, test_loader,exp_name):
     recall = round(recall,3)
 
 
-    false_positive_rate = FP / (FP + TP) if FP + TP != 0 else 0
-    false_positive_rate*=100
-    false_positive_rate = round(false_positive_rate,3)
+    false_discovery_rate = FP / (FP + TP) if FP + TP != 0 else 0
+    false_discovery_rate*=100
+    false_discovery_rate = round(false_discovery_rate,3)
 
     print(f"准确率: {accuracy}")
     print(f"召回率: {recall}")
-    print(f"误检率: {false_positive_rate},{FP}/{(FP + TP)}")
+    print(f"误检率: {false_discovery_rate},{FP}/{(FP + TP)}")
     print(f'Accuracy on the test set: {100 * correct / total}%')
     save_dir = "./cnn/"+exp_name+"/"
     os.makedirs(save_dir,exist_ok=True)
+
+    time_str = time.strftime("%Y%m%d%H%M%S", time.localtime())
+
+    save_name = save_dir+time_str+"_acc"+str(accuracy)+"_recall"+str(recall)+"_fdr"+str(false_discovery_rate)+".pth"
+    torch.save(net.state_dict(), save_name)
+
     if 100 * correct / total > 99.0:
         net.to('cpu')
         scripted_model = torch.jit.script(net)
@@ -153,7 +160,8 @@ def test_model(net, test_loader,exp_name):
         # input_shape = (1, 300,24)
         input_shape = (1,images.shape[1],images.shape[2],images.shape[3])
         torch.jit.trace(net,torch.rand(input_shape)).save(save_dir+'jit_best_model.pth')
-        torch.save(net.state_dict(), save_dir+'best_model.pth')
+        save_name = save_dir+time_str+"_acc"+str(accuracy)+"_recall"+str(recall)+"_fdr"+str(false_discovery_rate)+"best_model.pth"
+        torch.save(net.state_dict(),save_name)
     return 100 * correct / total
 def save_tensor_to_csv(tensor, filename):
     # Ensure the tensor is on the CPU and convert to a 2D tensor
@@ -192,20 +200,21 @@ def inference_test(net, folder_path, output_file):
                 _, predicted = torch.max(outputs.data, 1)
                 softmax_out = torch.softmax(outputs, dim=1)
                 score = softmax_out[0][1].item()
-                if score>0.7:
+                if score>0.5:
                     res =1
                 else:   
                     res =0
                 res_str = "{},{:.2f}".format(res,score*100)
                 res_str=save_name+res_str
+                res_str.replace('_',',')
                 f.write(res_str+'\n')
                 print(res_str)
-def train(data_dir_list,exp_name):
+def train(train_img_dir_list,exp_name):
     # 数据集路径
     # data_dir = './data/img_dataset/'
     images =[]
     labels = []
-    for data_dir in data_dir_list:
+    for data_dir in train_img_dir_list:
         images_, labels_ = get_images_and_labels(data_dir)
         images.extend(images_)
         labels.extend(labels_)
@@ -291,8 +300,8 @@ def main():
 
 if __name__ == "__main__":
     net = SimpleCNN()
-    # net.load_state_dict(torch.load('./cnn/exp4/best_model.pth'))
-    # inference_test(net=net,folder_path='./data/img_dataset/train_4_',output_file='./data/img_dataset/train1/exp4_result.txt')
+    # net.load_state_dict(torch.load('./cnn/exp5/20240108115449_acc99.921_recall99.656_fdr0.033.pth'))
+    # inference_test(net=net,folder_path='./data/img_dataset/test_4_0105_1',output_file='./cnn/exp5/exp5_test_4_0105_1_result.txt')
     # # main()
     # train(data_dir_list=['./data/img_dataset/train1/','./data/img_dataset/test2/','./data/img_dataset/test1/'],exp_name='exp2')
-    train(data_dir_list=['./data/img_dataset/train_4_all_time/'],exp_name='exp5')
+    train(train_img_dir_list=['./data/img_dataset/train_4_all_time/'],exp_name='exp6')
