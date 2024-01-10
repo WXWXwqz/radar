@@ -11,6 +11,8 @@ import pandas as pd
 from collections import Counter
 import numpy as np
 import time
+import random
+
 # 检查CUDA是否可用
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -206,7 +208,7 @@ def inference_test(net, folder_path, output_file):
                     res =0
                 res_str = "{},{:.2f}".format(res,score*100)
                 res_str=save_name+res_str
-                res_str.replace('_',',')
+                res_str=res_str.replace('_',',')
                 f.write(res_str+'\n')
                 print(res_str)
 def train(train_img_dir_list,exp_name):
@@ -219,15 +221,30 @@ def train(train_img_dir_list,exp_name):
         images.extend(images_)
         labels.extend(labels_)
     # images, labels = get_images_and_labels(data_dir)
-    print(Counter(labels))
+    label_counts = Counter(labels)
+
+    # 找到样本数量最少的类别
+    min_samples = min(label_counts.values())
+
+    # 欠采样
+    balanced_images = []
+    balanced_labels = []
+    for label in label_counts:
+        # 从每个类别中随机选择min_samples个样本
+        indices = [i for i, x in enumerate(labels) if x == label]
+        chosen_indices = random.sample(indices, min_samples)
+        balanced_images.extend([images[i] for i in chosen_indices])
+        balanced_labels.extend([labels[i] for i in chosen_indices])
+    # train_images, test_images, train_labels, test_labels = train_test_split(
+    #     images, labels, test_size=0.3, random_state=42)
     train_images, test_images, train_labels, test_labels = train_test_split(
-        images, labels, test_size=0.3, random_state=42)
+        balanced_images, balanced_labels, test_size=0.3, random_state=42)
 
     transform = transforms.Compose([
         transforms.Resize((360, 360)),
         transforms.ToTensor()
     ])
-
+    print(Counter(train_labels))
     train_dataset = ImageDataset(train_images, train_labels, transform=transform)
     test_dataset = ImageDataset(test_images, test_labels, transform=transform)
 
@@ -300,8 +317,8 @@ def main():
 
 if __name__ == "__main__":
     net = SimpleCNN()
-    # net.load_state_dict(torch.load('./cnn/exp5/20240108115449_acc99.921_recall99.656_fdr0.033.pth'))
-    # inference_test(net=net,folder_path='./data/img_dataset/test_4_0105_1',output_file='./cnn/exp5/exp5_test_4_0105_1_result.txt')
+    # net.load_state_dict(torch.load('./cnn/exp6/20240109131437_acc99.968_recall99.993_fdr0.123best_model.pth'))
+    # inference_test(net=net,folder_path='./data/img_dataset/test_4_0105_1',output_file='./cnn/exp6/exp6_test_4_0105_1_result.txt')
     # # main()
     # train(data_dir_list=['./data/img_dataset/train1/','./data/img_dataset/test2/','./data/img_dataset/test1/'],exp_name='exp2')
-    train(train_img_dir_list=['./data/img_dataset/train_4_all_time/'],exp_name='exp6')
+    train(train_img_dir_list=['./data/img_dataset/train_4_all_time/'],exp_name='exp7')

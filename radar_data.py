@@ -1184,6 +1184,31 @@ class RadarFeatureReduction:
                 print(pkl_file) 
         return raw_data    
 
+    def get_lanecode_list(self,raw_data,dir,length=10000,th =30):
+
+        dict_lanecode = {}
+        if length>len(raw_data):
+            length = len(raw_data)
+            print("ERROR")
+            print("Len of raw_data is "+str(len(raw_data))+" but length is "+str(length))
+
+        for frame in raw_data[0:length]:
+            for obj in frame.obj_info:
+                if (obj.obj_lanenum<200 and obj.radar_dir == dir//10 and obj.is_in_lane==dir%10):
+                    # if obj.obj_lanenum <6:
+                    #     print("ERROR")
+                    if obj.obj_lanenum not in dict_lanecode:
+                        dict_lanecode[obj.obj_lanenum]=1
+                    else:
+                        dict_lanecode[obj.obj_lanenum]+=1
+        print(dict_lanecode)
+        re_list=[]
+        for key in dict_lanecode.keys():
+            if dict_lanecode[key]>th:
+                re_list.append(key)
+                # del dict_lanecode[key]
+        print(re_list)
+        return re_list
 
 
 class Radar_Dat:
