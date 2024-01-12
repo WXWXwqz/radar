@@ -5,6 +5,7 @@ import datetime
 import bisect
 import os
 import csv
+import cv2
 def normalize_coordinates(list_x, list_y, X1, Y1):
     min_x, max_x = min(list_x), max(list_x)
     min_y, max_y = min(list_y), max(list_y)
@@ -38,7 +39,7 @@ def save_matrix_to_csv(matrix, filename):
         for row in matrix:
             writer.writerow(row)
 
-def AdaptAccidentHyperUpdate(start_time, end_time, ip,dir,frame_len=3000,frame_diff_msec=1000,th=20):
+def AdaptAccidentHyperUpdate(start_time, end_time, ip,dir,frame_len=7000,frame_diff_msec=1000,th=20):
     pkl_path = "./data/pkl/"+ip+"/"
     start_time = datetime.datetime.strptime(start_time, "%Y%m%d_%H%M%S")
     end_time = datetime.datetime.strptime(end_time, "%Y%m%d_%H%M%S")
@@ -100,11 +101,12 @@ def AdaptAccidentHyperUpdate(start_time, end_time, ip,dir,frame_len=3000,frame_d
         n_img_mead = np.mean(normalized_image)
         bin_image = np.where(normalized_image < n_img_mead*1.11177777777777, 0, 1).astype(np.uint8)
         res_img = np.bitwise_or(res_img, bin_image)
-        res_img1+=bin_image
+        # res_img1+=bin_image
+        res_img1 += img.astype(np.int64)
         # normalized_res_img1 = (res_img1 - np.min(res_img1)) / (np.max(res_img1) - np.min(res_img1)) * 255
 
         save_dir = "./detect_pre/"+ip+"/"
-        # os.makedirs(save_dir,exist_ok=True)
+        os.makedirs(save_dir,exist_ok=True)
         ss_time = s_time.strftime('%Y%m%d_%H%M%S')+ '_' + s_time.strftime('%f')[:3]
         se_time = frame.time.strftime('%Y%m%d_%H%M%S') + '_' + frame.time.strftime('%f')[:3]
         # e_time = check_time2_end.strftime('%Y%m%d_%H%M%S') + '_' + check_time2_end.strftime('%f')[:3]
@@ -201,8 +203,25 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
         # normalized_x, normalized_y = normalize_coordinates(x_label, y_label, 360, 360)
         normalized_image = (img - np.min(img)) / (np.max(img) - np.min(img)) * 255
         normalized_image = normalized_image.astype(np.uint8)
-        bin_normalized_image = np.where(normalized_image < 17, 0, 1).astype(np.uint8)
+        n_img_mead = np.mean(normalized_image)
+        bin_normalized_image = np.where(normalized_image < 1, 0, 1).astype(np.uint8)
         bin_normalized_image_mask = np.bitwise_or(bin_normalized_image,mask_img_flip)
+        kernel = np.ones((2, 2), np.uint8)
+        dilated_image = cv2.dilate(bin_normalized_image_mask, kernel, iterations=1)
+        eroded_image = cv2.erode(dilated_image, kernel, iterations=1)
+        eroded_image_flip = 1-eroded_image
+        contours, _ = cv2.findContours(eroded_image_flip, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        max_area = 0
+
+        # 遍历所有连通区域
+        for contour in contours:
+            # 计算每个区域的面积
+            area = cv2.contourArea(contour)
+            
+            # 更新最大面积
+            if area > max_area:
+                max_area = area        
+
         acc_res =preserve_vertical_zeros(bin_normalized_image_mask.copy(), sequence_length=5)
         bin_normalized_image_mask[0][0]=0
         acc_res[0][0]=0
@@ -221,34 +240,55 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
         plt.imsave(save_dir_tmp+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin.png', bin_normalized_image, cmap='gray')  
         plt.imsave(save_dir_tmp+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin_mask.png', bin_normalized_image_mask, cmap='gray')  
         plt.imsave(save_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_acc_res.png', acc_res, cmap='gray')
+        plt.imsave(save_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin_dilated_image.png', dilated_image, cmap='gray')
+        plt.imsave(save_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin_eroded_image'+str(max_area)+'.png', eroded_image, cmap='gray')
     None
 
 
 
 
 if  __name__ == "__main__":
-    start_time = "20240105_140000"
-    end_time = "20240105_155900"
-    ip = "37.31.190.252"
+    # start_time = "20240105_140000"
+    # end_time = "20240105_155900"
+    # # ip = "37.31.190.252"
+    # ip = "172.23.204.91"
+    ip_list=["172.23.204.91","172.23.204.95","37.31.205.161"]
+    s_time_list = ["20240105_120000","20240105_130000","202311071500"]
+    e_time_list = ["20240105_165900","20240105_165900","202311071659"]
+    adp_start_time_list = ["20240103_090000","20240104_100000","202311071500"]
+    adp_end_time_list = ["20240103_095900","20240105_105900","202311071659"]
+    dir_list = [10,11,30,31,50,51,70,71]
+    for i in range(len(ip_list)):
+        start_time = s_time_list[i]
+        end_time = e_time_list[i]
+        ip = ip_list[i]
+        a_s_time = adp_start_time_list[i]
+        a_e_time = adp_end_time_list[i]
+        for dir in dir_list:
+            if i==0 and dir<30:
+                continue
+                 
+            AdaptAccidentHyperUpdate(a_s_time,a_e_time,ip,dir)
+            AccidentDetection(start_time,end_time,ip,dir,frame_len=5777)
 
-    # AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,50)
+
     # AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,10)
     # AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,11)
-    AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,30)
-    AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,31)
-    AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,50)
-    AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,51)
-    AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,70)
-    AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,71)
-    # AccidentDetection(start_time,end_time,ip,50)
-    AccidentDetection(start_time,end_time,ip,10)
-    AccidentDetection(start_time,end_time,ip,11)
-    AccidentDetection(start_time,end_time,ip,30)
-    AccidentDetection(start_time,end_time,ip,31)
-    AccidentDetection(start_time,end_time,ip,50)
-    AccidentDetection(start_time,end_time,ip,51)
-    AccidentDetection(start_time,end_time,ip,70)
-    AccidentDetection(start_time,end_time,ip,71)
-    # AdaptAccidentHyperUpdate(start_time,end_time,ip,11)  
+    # AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,30)
+    # AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,31)
+    # AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,50)
+    # AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,51)
+    # AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,70)
+    # AdaptAccidentHyperUpdate("20240103_080000","20240103_085900",ip,71)
+    # # # AccidentDetection(start_time,end_time,ip,50)
+    # AccidentDetection(start_time,end_time,ip,10,frame_len=5777)
+    # AccidentDetection(start_time,end_time,ip,11,frame_len=5777)
+    # AccidentDetection(start_time,end_time,ip,30,frame_len=5777)
+    # AccidentDetection(start_time,end_time,ip,31,frame_len=5777)
+    # AccidentDetection(start_time,end_time,ip,50,frame_len=5777)
+    # AccidentDetection(start_time,end_time,ip,51,frame_len=5777)
+    # AccidentDetection(start_time,end_time,ip,70,frame_len=5777)
+    # AccidentDetection(start_time,end_time,ip,71,frame_len=5777)
+    # # AdaptAccidentHyperUpdate(start_time,end_time,ip,11)  
     
     

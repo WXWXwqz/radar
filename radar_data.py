@@ -1191,8 +1191,8 @@ class RadarFeatureReduction:
             length = len(raw_data)
             print("ERROR")
             print("Len of raw_data is "+str(len(raw_data))+" but length is "+str(length))
-
-        for frame in raw_data[0:length]:
+        max_lane_num = 0
+        for frame in raw_data:
             for obj in frame.obj_info:
                 if (obj.obj_lanenum<200 and obj.radar_dir == dir//10 and obj.is_in_lane==dir%10):
                     # if obj.obj_lanenum <6:
@@ -1201,10 +1201,18 @@ class RadarFeatureReduction:
                         dict_lanecode[obj.obj_lanenum]=1
                     else:
                         dict_lanecode[obj.obj_lanenum]+=1
+                    if dict_lanecode[obj.obj_lanenum]>max_lane_num:
+                        max_lane_num = dict_lanecode[obj.obj_lanenum]
+            if max_lane_num>10000:
+                break
+        if max_lane_num<10000:
+            for i in range(100):
+                print("ERROR")
+                print("Max lane num is "+str(max_lane_num))
         print(dict_lanecode)
         re_list=[]
         for key in dict_lanecode.keys():
-            if dict_lanecode[key]>th:
+            if dict_lanecode[key]>max_lane_num/100:
                 re_list.append(key)
                 # del dict_lanecode[key]
         print(re_list)
@@ -2108,12 +2116,12 @@ if __name__ == "__main__":
     # read_dat_to_pkl("./data/origin_radar/172.23.204.95")
 
     # origin_data_deal('./data/origin_radar/')
-    creat_image_dataset("./data/img_dataset/test_4_0105_1/","./data/img_dataset/test_4_0105.csv")
+    # creat_image_dataset("./data/img_dataset/test_4_0105_1/","./data/img_dataset/test_4_0105.csv")
     # creat_image_dataset("./data/img_dataset/tst/","./data/img_dataset/tst.csv")
     # creat_image_dataset("./data/img_dataset/train5/","./data/img_dataset/train5.csv")
-    # start_time = datetime.datetime.strptime("20240105_155000", "%Y%m%d_%H%M%S")
-    # end_time = datetime.datetime.strptime("20240105_155300", "%Y%m%d_%H%M%S")
-    # display_the_origin_radar_data_once(start_time=start_time,end_time=end_time,path="./data/pkl/172.23.204.91/",dir=30)
+    start_time = datetime.datetime.strptime("20240105_08000", "%Y%m%d_%H%M%S")
+    end_time = datetime.datetime.strptime("20240105_150000", "%Y%m%d_%H%M%S")
+    display_the_origin_radar_data_once(start_time=start_time,end_time=end_time,path="./data/pkl/37.31.190.252/",dir=51)
 
 
 
