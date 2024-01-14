@@ -2118,7 +2118,7 @@ if __name__ == "__main__":
     # origin_data_deal('./data/origin_radar/')
     # creat_image_dataset("./data/img_dataset/test_4_0105_1/","./data/img_dataset/test_4_0105.csv")
     # creat_image_dataset("./data/img_dataset/tst/","./data/img_dataset/tst.csv")
-    # creat_image_dataset("./data/img_dataset/train5/","./data/img_dataset/train5.csv")
+    creat_image_dataset("./data/img_dataset/train5/","./data/img_dataset/train5.csv")
     start_time = datetime.datetime.strptime("20240105_08000", "%Y%m%d_%H%M%S")
     end_time = datetime.datetime.strptime("20240105_150000", "%Y%m%d_%H%M%S")
     display_the_origin_radar_data_once(start_time=start_time,end_time=end_time,path="./data/pkl/37.31.190.252/",dir=51)

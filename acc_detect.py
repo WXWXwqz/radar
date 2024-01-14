@@ -1,4 +1,4 @@
-from radar_data import RadarFeatureReduction,Radar_Dat,Lane_Info,Obj_Info
+from radar_data import RadarFeatureReduction,Radar_Dat,Lane_Info,Obj_Info,get_image_csv_infor
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime
@@ -6,6 +6,7 @@ import bisect
 import os
 import csv
 import cv2
+
 def normalize_coordinates(list_x, list_y, X1, Y1):
     min_x, max_x = min(list_x), max(list_x)
     min_y, max_y = min(list_y), max(list_y)
@@ -41,6 +42,13 @@ def save_matrix_to_csv(matrix, filename):
 
 def AdaptAccidentHyperUpdate(start_time, end_time, ip,dir,frame_len=7000,frame_diff_msec=1000,th=20):
     pkl_path = "./data/pkl/"+ip+"/"
+    
+    save_dir = "./detect_pre/"+ip+"/"
+    os.makedirs(save_dir,exist_ok=True)
+    if os.path.exists(save_dir+'dir_'+str(dir) +'_HyperPara.npz'):
+        return
+
+
     start_time = datetime.datetime.strptime(start_time, "%Y%m%d_%H%M%S")
     end_time = datetime.datetime.strptime(end_time, "%Y%m%d_%H%M%S")
     radar_feature = RadarFeatureReduction(start_time=start_time,end_time=end_time,path=pkl_path)
@@ -105,8 +113,8 @@ def AdaptAccidentHyperUpdate(start_time, end_time, ip,dir,frame_len=7000,frame_d
         res_img1 += img.astype(np.int64)
         # normalized_res_img1 = (res_img1 - np.min(res_img1)) / (np.max(res_img1) - np.min(res_img1)) * 255
 
-        save_dir = "./detect_pre/"+ip+"/"
-        os.makedirs(save_dir,exist_ok=True)
+        
+        
         ss_time = s_time.strftime('%Y%m%d_%H%M%S')+ '_' + s_time.strftime('%f')[:3]
         se_time = frame.time.strftime('%Y%m%d_%H%M%S') + '_' + frame.time.strftime('%f')[:3]
         # e_time = check_time2_end.strftime('%Y%m%d_%H%M%S') + '_' + check_time2_end.strftime('%f')[:3]
@@ -158,7 +166,9 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
     min_y = y_min
     min_x = x_min
 
-    
+    acc_c=0    
+    cX = 0
+    cY = 0
     while True:
         index_s = bisect.bisect(radar_feature.raw_data_time,s_time)
         s_time = s_time+datetime.timedelta(milliseconds=frame_diff_msec)
@@ -214,6 +224,7 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
         max_area = 0
 
         # 遍历所有连通区域
+        
         for contour in contours:
             # 计算每个区域的面积
             area = cv2.contourArea(contour)
@@ -221,13 +232,19 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
             # 更新最大面积
             if area > max_area:
                 max_area = area        
-
+                M = cv2.moments(contour)
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"])
+                    cY = int(M["m01"] / M["m00"])
         acc_res =preserve_vertical_zeros(bin_normalized_image_mask.copy(), sequence_length=5)
         bin_normalized_image_mask[0][0]=0
         acc_res[0][0]=0
+        
 
-        save_dir = "./detect/"+ip+"/"+str(dir)+"/"
-        save_dir_tmp = "./detect/"+ip+"/"+str(dir)+"/"+"tmp/"
+        save_dir = "/home/edgeai/store/radar/detect/"+ip+"/"+str(dir)+"/"
+        save_dir_tmp = "/home/edgeai/store/radar/detect/"+ip+"/"+str(dir)+"/"+"tmp/"
+        result_dir =  "/home/edgeai/store/radar/detect/"+ip+"/"
+
         os.makedirs(save_dir,exist_ok=True)
         os.makedirs(save_dir_tmp,exist_ok=True)
         ss_time = s_time.strftime('%Y%m%d_%H%M%S')+ '_' + s_time.strftime('%f')[:3]
@@ -235,28 +252,59 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
         # e_time = check_time2_end.strftime('%Y%m%d_%H%M%S') + '_' + check_time2_end.strftime('%f')[:3]
         save_matrix_to_csv(normalized_image, save_dir_tmp+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin.csv')
 
+
         print(save_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_.png')
-        plt.imsave(save_dir_tmp+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_nor.png', normalized_image, cmap='gray')  
-        plt.imsave(save_dir_tmp+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin.png', bin_normalized_image, cmap='gray')  
-        plt.imsave(save_dir_tmp+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin_mask.png', bin_normalized_image_mask, cmap='gray')  
-        plt.imsave(save_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_acc_res.png', acc_res, cmap='gray')
-        plt.imsave(save_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin_dilated_image.png', dilated_image, cmap='gray')
-        plt.imsave(save_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin_eroded_image'+str(max_area)+'.png', eroded_image, cmap='gray')
+        
+        if max_area>max_y*0.5:
+            ssss_dir = save_dir
+        else:
+            ssss_dir = save_dir_tmp
+        
+        plt.imsave(ssss_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_nor.png', normalized_image, cmap='gray')  
+        plt.imsave(ssss_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin.png', bin_normalized_image, cmap='gray')  
+        plt.imsave(ssss_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin_mask.png', bin_normalized_image_mask, cmap='gray')  
+        plt.imsave(ssss_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_acc_res.png', acc_res, cmap='gray')
+        plt.imsave(ssss_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin_dilated_image.png', dilated_image, cmap='gray')
+        plt.imsave(ssss_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin_eroded_image'+str(max_area)+'.png', eroded_image, cmap='gray')
+        is_acc =0 
+        if max_area>max_y*1.57:
+            acc_c+=1
+        else:
+            acc_c=0
+        if acc_c>27:
+            is_acc =1
+
+
+        
+        with open(result_dir+str(dir)+'result.txt', 'a', encoding='utf-8') as file:
+            file.write("acc,"+str(is_acc)+",acc_c,"+str(acc_c)+",acc size,"+str(max_area)+',acc xy ,'+str(cX)+','+str(cY)+',img size,'+str(max_x)+','+str(max_y)+','+'dir,'+str(dir) +','+ss_time+","+se_time+","+str(len(x_label))+','+ip+"\r\n")
     None
 
 
 
+if __name__ == "__main__":  
 
-if  __name__ == "__main__":
+    start_time_list,end_time_list,dir_list,is_acc_list,ip_list,frame_len,fram_diff = get_image_csv_infor('./detect/tst.csv')
+    for i in range(len(start_time_list)):
+        start_time = start_time_list[i]
+        end_time = end_time_list[i]
+        ip = ip_list[i]
+        dir = dir_list[i]
+        is_acc = is_acc_list[i]
+        print(start_time,end_time,ip,dir)
+        AdaptAccidentHyperUpdate(start_time,end_time,ip,dir,frame_len=5777)
+        AccidentDetection(start_time,end_time,ip,dir,frame_len=5777)
+
+if  __name__ == "__main_-_":
     # start_time = "20240105_140000"
     # end_time = "20240105_155900"
     # # ip = "37.31.190.252"
     # ip = "172.23.204.91"
     ip_list=["172.23.204.91","172.23.204.95","37.31.205.161"]
     s_time_list = ["20240105_120000","20240105_130000","202311071500"]
-    e_time_list = ["20240105_165900","20240105_165900","202311071659"]
+    e_time_list = ["20240105_145900","20240105_165900","202311071659"]
     adp_start_time_list = ["20240103_090000","20240104_100000","202311071500"]
-    adp_end_time_list = ["20240103_095900","20240105_105900","202311071659"]
+    adp_end_time_list = ["20240103_095900","20240104_105900","202311071659"]
     dir_list = [10,11,30,31,50,51,70,71]
     for i in range(len(ip_list)):
         start_time = s_time_list[i]
@@ -265,9 +313,8 @@ if  __name__ == "__main__":
         a_s_time = adp_start_time_list[i]
         a_e_time = adp_end_time_list[i]
         for dir in dir_list:
-            if i==0 and dir<30:
-                continue
-                 
+            if i==0 :
+                continue                 
             AdaptAccidentHyperUpdate(a_s_time,a_e_time,ip,dir)
             AccidentDetection(start_time,end_time,ip,dir,frame_len=5777)
 
