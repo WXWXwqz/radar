@@ -6,6 +6,7 @@ import bisect
 import os
 import csv
 import cv2
+from multiprocessing import Pool
 
 def normalize_coordinates(list_x, list_y, X1, Y1):
     min_x, max_x = min(list_x), max(list_x)
@@ -292,6 +293,25 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
 
 
 
+def process_task(start_time, end_time, ip, dir, is_acc, frame_len=5777):
+    print(start_time, end_time, ip, dir)
+    AdaptAccidentHyperUpdate(start_time, end_time, ip, dir, frame_len)
+    AccidentDetection(start_time, end_time, ip, dir, frame_len)
+
+def main():
+    start_time_list, end_time_list, dir_list, is_acc_list, ip_list, frame_len, fram_diff = get_image_csv_infor('./detect/tst.csv')
+    frame_len = 5777  # 如果frame_len是固定的，可以直接在这里设置
+
+    num_processes = 10  # 可以根据你的机器性能和任务特性来设置进程数
+
+    with Pool(processes=num_processes) as pool:
+        tasks = [(start_time_list[i], end_time_list[i], ip_list[i], dir_list[i], is_acc_list[i], frame_len) for i in range(len(start_time_list))]
+        pool.starmap(process_task, tasks)
+
+if __name__ == "__main__":
+    main()
+
+
 if __name__ == "__main_-_":  
 
     start_time_list,end_time_list,dir_list,is_acc_list,ip_list,frame_len,fram_diff = get_image_csv_infor('./detect/tst.csv')
@@ -305,7 +325,7 @@ if __name__ == "__main_-_":
         AdaptAccidentHyperUpdate(start_time,end_time,ip,dir,frame_len=5777)
         AccidentDetection(start_time,end_time,ip,dir,frame_len=5777)
 
-if  __name__ == "__main__":
+if  __name__ == "__main_-_":
     # start_time = "20240105_140000"
     # end_time = "20240105_155900"
     # # ip = "37.31.190.252"
