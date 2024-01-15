@@ -179,10 +179,14 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
         speed =[]
         lane_dict_obj_num = {}
         frame_cnt =0
-        while len(x_label)<frame_len:
+        frame_start_time = None
+        while len(x_label)<frame_len or frame_time_sec<150:
             if (index_s+frame_cnt) > len(radar_feature.raw_data)-1:
                 break
             frame  = radar_feature.raw_data[index_s+frame_cnt]
+            if frame_start_time is None:
+                frame_start_time = frame.time
+
             frame_cnt +=1
             for obj in frame.obj_info:
                 if not (obj.obj_lanenum in lanecode_list and obj.radar_dir == dir//10 and obj.is_in_lane==dir%10):
@@ -190,7 +194,13 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
                 speed.append(obj.speed)
                 x_label.append(obj.x)
                 y_label.append(obj.y)
-        frame_end_time = frame.time
+            frame_end_time = frame.time
+            frame_time_sec = frame_end_time-frame_start_time
+            frame_time_sec = frame_time_sec.total_seconds()
+            # print(frame_time_sec)
+            None
+
+
         if frame_end_time>end_time:
             break
         # 画图
@@ -255,7 +265,7 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
 
         print(save_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_.png')
         
-        if max_area>max_y*0.5:
+        if max_area>max_y*1.57:
             ssss_dir = save_dir
         else:
             ssss_dir = save_dir_tmp
@@ -282,7 +292,7 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
 
 
 
-if __name__ == "__main__":  
+if __name__ == "__main_-_":  
 
     start_time_list,end_time_list,dir_list,is_acc_list,ip_list,frame_len,fram_diff = get_image_csv_infor('./detect/tst.csv')
     for i in range(len(start_time_list)):
@@ -295,14 +305,14 @@ if __name__ == "__main__":
         AdaptAccidentHyperUpdate(start_time,end_time,ip,dir,frame_len=5777)
         AccidentDetection(start_time,end_time,ip,dir,frame_len=5777)
 
-if  __name__ == "__main_-_":
+if  __name__ == "__main__":
     # start_time = "20240105_140000"
     # end_time = "20240105_155900"
     # # ip = "37.31.190.252"
     # ip = "172.23.204.91"
     ip_list=["172.23.204.91","172.23.204.95","37.31.205.161"]
     s_time_list = ["20240105_120000","20240105_130000","202311071500"]
-    e_time_list = ["20240105_145900","20240105_165900","202311071659"]
+    e_time_list = ["20240105_125900","20240105_135900","202311071659"]
     adp_start_time_list = ["20240103_090000","20240104_100000","202311071500"]
     adp_end_time_list = ["20240103_095900","20240104_105900","202311071659"]
     dir_list = [10,11,30,31,50,51,70,71]
