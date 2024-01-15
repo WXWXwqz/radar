@@ -252,9 +252,9 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
         acc_res[0][0]=0
         
 
-        save_dir = "/home/edgeai/store/radar/detect/"+ip+"/"+str(dir)+"/"
-        save_dir_tmp = "/home/edgeai/store/radar/detect/"+ip+"/"+str(dir)+"/"+"tmp/"
-        result_dir =  "/home/edgeai/store/radar/detect/"+ip+"/"
+        save_dir = "./detect/"+ip+"/"+str(dir)+"/"
+        save_dir_tmp = "./detect/"+ip+"/"+str(dir)+"/"+"tmp/"
+        result_dir =  "./detect/"+ip+"/"
 
         os.makedirs(save_dir,exist_ok=True)
         os.makedirs(save_dir_tmp,exist_ok=True)
