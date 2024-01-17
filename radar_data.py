@@ -2111,17 +2111,17 @@ if __name__ == "__main__":
 
     # read_dat_to_pkl("./data/tst/")   
     # read_dat_to_pkl("./data/origin_radar/37.31.190.252")
-    # read_dat_to_pkl("./data/origin_radar/37.31.205.161")
+    read_dat_to_pkl("./data/origin_radar/37.31.205.161")
     # read_dat_to_pkl("./data/origin_radar/172.23.204.91")
     # read_dat_to_pkl("./data/origin_radar/172.23.204.95")
 
     # origin_data_deal('./data/origin_radar/')
     # creat_image_dataset("./data/img_dataset/test_4_0105_1/","./data/img_dataset/test_4_0105.csv")
     # creat_image_dataset("./data/img_dataset/tst/","./data/img_dataset/tst.csv")
-    creat_image_dataset("./data/img_dataset/train5/","./data/img_dataset/train5.csv")
-    start_time = datetime.datetime.strptime("20240105_08000", "%Y%m%d_%H%M%S")
-    end_time = datetime.datetime.strptime("20240105_150000", "%Y%m%d_%H%M%S")
-    display_the_origin_radar_data_once(start_time=start_time,end_time=end_time,path="./data/pkl/37.31.190.252/",dir=51)
+    # creat_image_dataset("./data/img_dataset/train5/","./data/img_dataset/train5.csv")
+    # start_time = datetime.datetime.strptime("20240104_145300", "%Y%m%d_%H%M%S")
+    # end_time = datetime.datetime.strptime("20240104_145800", "%Y%m%d_%H%M%S")
+    # display_the_origin_radar_data_once(start_time=start_time,end_time=end_time,path="./data/pkl/172.23.204.95/",dir=51)
 
 
 

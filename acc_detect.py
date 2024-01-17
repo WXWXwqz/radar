@@ -56,6 +56,8 @@ def AdaptAccidentHyperUpdate(start_time, end_time, ip,dir,frame_len=7000,frame_d
     lanecode_list = radar_feature.get_lanecode_list(raw_data=radar_feature.raw_data,dir=dir)
     x_min,x_max,y_min,y_max = Max_Min_xy_get(radar_feature.raw_data[0:10000],lanecode_list)
     
+
+
     x_max-=x_min
     y_max-=y_min
 
@@ -97,6 +99,8 @@ def AdaptAccidentHyperUpdate(start_time, end_time, ip,dir,frame_len=7000,frame_d
         # y -= y_min
         x = (np.array(x_label)-x_min)/250.0
         y = (np.array(y_label-y_min))/50.0
+
+
 
 
         img = np.zeros((round(y_max)+1,round(x_max)+1),dtype=np.float64)
@@ -157,6 +161,8 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
     end_time = datetime.datetime.strptime(end_time, "%Y%m%d_%H%M%S")
     radar_feature = RadarFeatureReduction(start_time=start_time,end_time=end_time,path=pkl_path)
     lanecode_list = radar_feature.get_lanecode_list(raw_data=radar_feature.raw_data,dir=dir)
+    lanecode_list.sort()
+    print(lanecode_list)
     s_time = start_time
     data_ = np.load('./detect_pre/'+ip+'/dir_'+str(dir)+'_HyperPara.npz')
     x_min,x_max,y_min,y_max = data_['extremaArray']
@@ -170,6 +176,7 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
     acc_c=0    
     cX = 0
     cY = 0
+    dict_lane_y_max_min = {}
     while True:
         index_s = bisect.bisect(radar_feature.raw_data_time,s_time)
         s_time = s_time+datetime.timedelta(milliseconds=frame_diff_msec)
@@ -177,6 +184,7 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
             break
         x_label = []
         y_label = []
+        lane_num_label = []
         speed =[]
         lane_dict_obj_num = {}
         frame_cnt =0
@@ -195,13 +203,21 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
                 speed.append(obj.speed)
                 x_label.append(obj.x)
                 y_label.append(obj.y)
+                lane_num_label.append(obj.obj_lanenum)
+                if obj.obj_lanenum not in dict_lane_y_max_min:
+                    dict_lane_y_max_min[obj.obj_lanenum]=[obj.y,obj.y]
+                else:
+                    if dict_lane_y_max_min[obj.obj_lanenum][0]<obj.y:
+                        dict_lane_y_max_min[obj.obj_lanenum][0] = obj.y
+                    if dict_lane_y_max_min[obj.obj_lanenum][1]>obj.y:
+                        dict_lane_y_max_min[obj.obj_lanenum][1] = obj.y
             frame_end_time = frame.time
             frame_time_sec = frame_end_time-frame_start_time
             frame_time_sec = frame_time_sec.total_seconds()
             # print(frame_time_sec)
             None
 
-
+      
         if frame_end_time>end_time:
             break
         # 画图
@@ -217,10 +233,12 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
         # max_y = np.max(y)
 
         img = np.zeros((round(max_y)+1,round(max_x)+1),dtype=np.float64)
+        lane_img = np.zeros((len(lanecode_list),round(max_x)+1),dtype=np.float64)
         for i in range(len(x)):
             if y[i]>max_y or x[i]>max_x:
                 continue
             img[round(y[i]),round(x[i])] += speed[i]/100
+            lane_img[lanecode_list.index(lane_num_label[i]),round(x[i])]+= speed[i]/100
         # normalized_x, normalized_y = normalize_coordinates(x_label, y_label, 360, 360)
         normalized_image = (img - np.min(img)) / (np.max(img) - np.min(img)) * 255
         normalized_image = normalized_image.astype(np.uint8)
@@ -252,16 +270,15 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
         acc_res[0][0]=0
         
 
-        save_dir = "./detect/"+ip+"/"+str(dir)+"/"
-        save_dir_tmp = "./detect/"+ip+"/"+str(dir)+"/"+"tmp/"
-        result_dir =  "./detect/"+ip+"/"
+        save_dir = "/home/edgeai/store/radar/detect/"+ip+"/"+str(dir)+"/"
+        save_dir_tmp = "/home/edgeai/store/radar/detect/"+ip+"/"+str(dir)+"/"+"tmp/"
+        result_dir =  "/home/edgeai/store/radar/detect/"+ip+"/"
 
         os.makedirs(save_dir,exist_ok=True)
         os.makedirs(save_dir_tmp,exist_ok=True)
         ss_time = s_time.strftime('%Y%m%d_%H%M%S')+ '_' + s_time.strftime('%f')[:3]
         se_time = frame.time.strftime('%Y%m%d_%H%M%S') + '_' + frame.time.strftime('%f')[:3]
         # e_time = check_time2_end.strftime('%Y%m%d_%H%M%S') + '_' + check_time2_end.strftime('%f')[:3]
-        save_matrix_to_csv(normalized_image, save_dir_tmp+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin.csv')
 
 
         print(save_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_.png')
@@ -270,7 +287,9 @@ def AccidentDetection(start_time, end_time, ip,dir,frame_len=3000,frame_diff_mse
             ssss_dir = save_dir
         else:
             ssss_dir = save_dir_tmp
-        
+        save_matrix_to_csv(lane_img.T, ssss_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_laneimg.csv')
+        save_matrix_to_csv(normalized_image.T, ssss_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin.csv')
+     
         plt.imsave(ssss_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_nor.png', normalized_image, cmap='gray')  
         plt.imsave(ssss_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin.png', bin_normalized_image, cmap='gray')  
         plt.imsave(ssss_dir+'dir_'+str(dir) +'_'+ss_time+"_"+se_time+"_"+str(len(x_label))+'_'+ip+'_bin_mask.png', bin_normalized_image_mask, cmap='gray')  
@@ -300,19 +319,17 @@ def process_task(start_time, end_time, ip, dir, is_acc, frame_len=5777):
 
 def main():
     start_time_list, end_time_list, dir_list, is_acc_list, ip_list, frame_len, fram_diff = get_image_csv_infor('./detect/tst.csv')
-    frame_len = 5777  # 如果frame_len是固定的，可以直接在这里设置
-
-    num_processes = 10  # 可以根据你的机器性能和任务特性来设置进程数
-
+    frame_len = 5777  
+    num_processes = 10  
     with Pool(processes=num_processes) as pool:
         tasks = [(start_time_list[i], end_time_list[i], ip_list[i], dir_list[i], is_acc_list[i], frame_len) for i in range(len(start_time_list))]
         pool.starmap(process_task, tasks)
 
-if __name__ == "__main__":
+if __name__ == "__main_-_":
     main()
 
 
-if __name__ == "__main_-_":  
+if __name__ == "__main__":  
 
     start_time_list,end_time_list,dir_list,is_acc_list,ip_list,frame_len,fram_diff = get_image_csv_infor('./detect/tst.csv')
     for i in range(len(start_time_list)):
@@ -325,26 +342,24 @@ if __name__ == "__main_-_":
         AdaptAccidentHyperUpdate(start_time,end_time,ip,dir,frame_len=5777)
         AccidentDetection(start_time,end_time,ip,dir,frame_len=5777)
 
-if  __name__ == "__main_-_":
+if  __name__ == "__main-__":
     # start_time = "20240105_140000"
     # end_time = "20240105_155900"
     # # ip = "37.31.190.252"
     # ip = "172.23.204.91"
-    ip_list=["172.23.204.91","172.23.204.95","37.31.205.161"]
-    s_time_list = ["20240105_120000","20240105_130000","202311071500"]
-    e_time_list = ["20240105_125900","20240105_135900","202311071659"]
-    adp_start_time_list = ["20240103_090000","20240104_100000","202311071500"]
-    adp_end_time_list = ["20240103_095900","20240104_105900","202311071659"]
-    dir_list = [10,11,30,31,50,51,70,71]
+    ip_list=["172.23.204.95"]
+    s_time_list = ["20240104_174500"]
+    e_time_list = ["20240104_191500"]
+    adp_start_time_list = ["20240103_090000"]
+    adp_end_time_list = ["20240103_095900"]
+    dir_list = [51]
     for i in range(len(ip_list)):
         start_time = s_time_list[i]
         end_time = e_time_list[i]
         ip = ip_list[i]
         a_s_time = adp_start_time_list[i]
         a_e_time = adp_end_time_list[i]
-        for dir in dir_list:
-            if i==0 :
-                continue                 
+        for dir in dir_list:            
             AdaptAccidentHyperUpdate(a_s_time,a_e_time,ip,dir)
             AccidentDetection(start_time,end_time,ip,dir,frame_len=5777)
 
