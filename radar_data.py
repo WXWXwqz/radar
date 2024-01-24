@@ -1662,8 +1662,9 @@ def display_the_origin_radar_data_once(start_time,end_time,path,dir):
         obj_y+=obj_y_coords
         
     ax.scatter(obj_x, obj_y,s=1)
-    plt.draw()
-    plt.pause(500)
+    # plt.draw()
+    plt.savefig('scatter_plot.png')
+    # plt.pause(500)
 def display_the_history_trace(start_time,end_time,path,dir,label):
     radar_feature = Radar_Feature(start_time=start_time,end_time=end_time,path=path)
     fig, ax = plt.subplots()
@@ -2111,7 +2112,7 @@ if __name__ == "__main__":
 
     # read_dat_to_pkl("./data/tst/")   
     # read_dat_to_pkl("./data/origin_radar/37.31.190.252")
-    read_dat_to_pkl("./data/origin_radar/37.31.205.161")
+    # read_dat_to_pkl("./data/origin_radar/37.31.205.161")
     # read_dat_to_pkl("./data/origin_radar/172.23.204.91")
     # read_dat_to_pkl("./data/origin_radar/172.23.204.95")
 
@@ -2119,10 +2120,12 @@ if __name__ == "__main__":
     # creat_image_dataset("./data/img_dataset/test_4_0105_1/","./data/img_dataset/test_4_0105.csv")
     # creat_image_dataset("./data/img_dataset/tst/","./data/img_dataset/tst.csv")
     # creat_image_dataset("./data/img_dataset/train5/","./data/img_dataset/train5.csv")
-    # start_time = datetime.datetime.strptime("20240104_145300", "%Y%m%d_%H%M%S")
-    # end_time = datetime.datetime.strptime("20240104_145800", "%Y%m%d_%H%M%S")
-    # display_the_origin_radar_data_once(start_time=start_time,end_time=end_time,path="./data/pkl/172.23.204.95/",dir=51)
-
+    start_time = datetime.datetime.strptime("20240104_180200", "%Y%m%d_%H%M%S")
+    end_time = datetime.datetime.strptime("20240104_180400", "%Y%m%d_%H%M%S")
+    display_the_origin_radar_data_once(start_time=start_time,end_time=end_time,path="./data/pkl/172.23.204.91/",dir=71)
+    # start_time = datetime.datetime.strptime("20231218_232000", "%Y%m%d_%H%M%S")
+    # end_time = datetime.datetime.strptime("20231218_232700", "%Y%m%d_%H%M%S")
+    # display_the_origin_radar_data_once(start_time=start_time,end_time=end_time,path="./data/pkl/37.31.205.161/",dir=51)
 
 
 
